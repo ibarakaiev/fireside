@@ -24,3 +24,5 @@ fireside-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+livebooks
