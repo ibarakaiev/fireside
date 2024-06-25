@@ -1,8 +1,8 @@
 defmodule Fireside.Util.Install do
   def install(component) do
-    IO.puts("Installing #{component}")
+    Mix.shell().info("Installing #{component}")
 
-    {component_name, [path: component_path]} = determine_dep_type_and_version(component)
+    {_component_name, [path: component_path]} = determine_dep_type_and_version(component)
 
     if not File.dir?(component_path) do
       raise "directory `#{component_path} doesn't exist"
@@ -16,7 +16,56 @@ defmodule Fireside.Util.Install do
 
     fireside_opts = eval_file_with_keyword_list(fireside_config_path)
 
-    IO.inspect(fireside_opts)
+    Keyword.validate!(fireside_opts, [:includes, :overwritable])
+
+    {fireside_includes, _fireside_opts} = Keyword.pop!(fireside_opts, :includes)
+
+    igniter =
+      for include_glob <- fireside_includes, reduce: Igniter.new() do
+        igniter ->
+          Path.join(component_path, include_glob)
+          |> GlobEx.compile!()
+          |> GlobEx.ls()
+          |> Enum.reduce(igniter, fn file_path, igniter ->
+            contents = File.read!(file_path)
+
+            quoted = Sourceror.parse_string!(contents)
+
+            {:defmodule, _defmodule_meta,
+             [{:__aliases__, _aliases_meta, [prefix | _suffix]} | _rest]} = quoted
+
+            app_name_atom =
+              Igniter.Code.Module.module_name_prefix()
+              |> Module.split()
+              |> List.first()
+              |> String.to_atom()
+
+            patched_quoted =
+              quoted
+              |> Macro.prewalk(fn
+                {:__aliases__, aliases_meta, [^prefix]} ->
+                  {:__aliases__, aliases_meta, [app_name_atom]}
+
+                {:__aliases__, aliases_meta, [^prefix | rest]} ->
+                  {:__aliases__, aliases_meta, [app_name_atom | rest]}
+
+                quoted ->
+                  quoted
+              end)
+
+            {:defmodule, _defmodule_meta,
+             [{:__aliases__, _aliases_meta, new_module_name} | _rest]} =
+              patched_quoted
+
+            Igniter.create_new_elixir_file(
+              igniter,
+              Igniter.Code.Module.proper_location(Module.concat(new_module_name)),
+              Sourceror.to_string(patched_quoted)
+            )
+          end)
+      end
+
+    Igniter.do_or_dry_run(igniter, ["--dry-run"])
   end
 
   defp determine_dep_type_and_version(requirement) do
