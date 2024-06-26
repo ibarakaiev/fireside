@@ -16,10 +16,11 @@ defmodule Fireside.Util.Install do
 
     fireside_opts = eval_file_with_keyword_list(fireside_config_path)
 
-    Keyword.validate!(fireside_opts, [:lib, :overwritable, :tests])
+    # TODO: implement overwritable functionality
+    Keyword.validate!(fireside_opts, [:lib, :overwritable, :tests, :test_supports])
 
     %{igniter: igniter, lock: lock} =
-      for kind <- [:lib, :tests], reduce: %{igniter: Igniter.new(), lock: []} do
+      for kind <- [:lib, :tests, :test_supports], reduce: %{igniter: Igniter.new(), lock: []} do
         %{igniter: igniter, lock: lock} ->
           {includes, _opts} = Keyword.pop!(fireside_opts, kind)
 
@@ -169,7 +170,7 @@ defmodule Fireside.Util.Install do
     {Enum.reduce(deps, igniter, fn dep, igniter ->
        {name, version, opts} =
          case dep do
-           {name, version, opts} = dep -> dep
+           {_name, _version, _opts} = dep -> dep
            {name, version} -> {name, version, []}
          end
 
@@ -195,6 +196,9 @@ defmodule Fireside.Util.Install do
 
         :tests ->
           Igniter.Code.Module.proper_test_location(module_name)
+
+        :test_supports ->
+          Igniter.Code.Module.proper_test_support_location(module_name)
       end
 
     {Igniter.create_new_elixir_file(
