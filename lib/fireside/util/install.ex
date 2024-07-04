@@ -1,37 +1,75 @@
 defmodule Fireside.Util.Install do
-  def install(component) do
-    Mix.shell().info("Installing #{component}")
+  def install(app) do
+    Mix.shell().info("Installing #{app}")
 
-    {component_name, [path: component_path]} = determine_component_type_and_version(component)
+    {app_name, [path: app_path]} = determine_app_type_and_version(app)
 
-    if not File.dir?(component_path) do
-      raise "directory `#{component_path}` doesn't exist"
+    if not File.dir?(app_path) do
+      raise "directory `#{app_path}` doesn't exist"
     end
 
-    fireside_config_path = Path.join(component_path, "/.fireside.exs")
+    fireside_config = get_fireside_app_config(app_path)
 
-    if not File.exists?(fireside_config_path) do
-      raise "#{component_path} is not a Fireside component, aborting."
-    end
-
-    fireside_config = eval_file_with_keyword_list(fireside_config_path)
-
-    # TODO: implement overwritable functionality
-    Keyword.validate!(fireside_config, [:lib, :overwritable, :tests, :test_supports])
+    expanded_fireside_includes = expand_fireside_includes(app_path, fireside_config)
 
     Igniter.new()
-    |> install_dependencies(component_path)
-    |> install_source_code(component_name, component_path, fireside_config)
+    # |> install_dependencies(app_path)
+    |> install_code(expanded_fireside_includes)
+    |> run_installer(app_name)
+    |> replace_application_name_in_imported_files()
+    |> add_fireside_lock(app_name)
     |> Igniter.do_or_dry_run([])
 
     :ok
   end
 
-  defp install_dependencies(igniter, component_path) do
-    mix_file = Path.join(component_path, "mix.exs")
+  # TODO: verify the config
+  defp get_fireside_app_config(app_path) do
+    fireside_config_path = Path.join(app_path, "/fireside.exs")
+
+    if not File.exists?(fireside_config_path) do
+      raise "#{app_path} is not a Fireside app, aborting."
+    end
+
+    # TODO: support non-static map definitions
+    {config, _} =
+      fireside_config_path
+      |> File.read!()
+      |> Sourceror.parse_string!()
+      |> Sourceror.Zipper.zip()
+      |> Igniter.Code.Module.move_to_def(:app, 0)
+      |> then(fn {:ok, zipper} ->
+        zipper
+        |> Sourceror.Zipper.node()
+        |> Code.eval_quoted()
+      end)
+
+    config
+  end
+
+  defp expand_fireside_includes(app_path, fireside_config) do
+    for kind <- [:lib, :tests, :test_supports], reduce: %{} do
+      expanded_includes ->
+        includes = fireside_config[kind]
+
+        expanded_paths =
+          for glob <- includes, reduce: [] do
+            expanded_paths ->
+              expanded_paths ++
+                (Path.join(app_path, glob)
+                 |> GlobEx.compile!()
+                 |> GlobEx.ls())
+          end
+
+        Map.merge(expanded_includes, %{kind => expanded_paths})
+    end
+  end
+
+  defp install_dependencies(igniter, app_path) do
+    mix_file = Path.join(app_path, "mix.exs")
 
     unless File.exists?(mix_file) do
-      raise "mix.exs not found in the component directory"
+      raise "mix.exs not found in the app directory"
     end
 
     {deps, _} =
@@ -80,114 +118,106 @@ defmodule Fireside.Util.Install do
         &<=/2
       )
 
-    title =
-      case desired_tasks do
-        [task] ->
-          "Final result of installer: `#{task}`"
-
-        tasks ->
-          "Final result of installers: #{Enum.map_join(tasks, ", ", &"`#{&1}`")}"
-      end
-
     igniter_tasks
     |> Enum.reduce(igniter, fn task, igniter ->
       Igniter.compose_task(igniter, task, [])
     end)
-    |> Igniter.do_or_dry_run(title: title)
   end
 
-  defp install_source_code(igniter, component_name, component_path, fireside_config) do
-    %{igniter: igniter, lock: lock} =
-      for kind <- [:lib, :tests, :test_supports], reduce: %{igniter: Igniter.new(), lock: []} do
-        %{igniter: igniter, lock: lock} ->
-          {includes, _opts} = Keyword.pop!(fireside_config, kind)
+  defp install_code(igniter, expanded_fireside_includes) do
+    for kind <- [:lib, :tests, :test_supports], reduce: igniter do
+      igniter ->
+        for path <- expanded_fireside_includes[kind], reduce: igniter do
+          igniter ->
+            import_to_project(igniter, path, kind)
+        end
+    end
+  end
 
-          for glob <- includes, reduce: %{igniter: igniter, lock: lock} do
-            %{igniter: igniter, lock: lock} ->
-              file_paths =
-                Path.join(component_path, glob)
-                |> GlobEx.compile!()
-                |> GlobEx.ls()
+  defp run_installer(igniter, app_name) do
+    Igniter.compose_task(igniter, "mix #{app_name}.install", [])
+  end
 
-              for file_path <- file_paths, reduce: %{igniter: igniter, lock: lock} do
-                %{igniter: igniter, lock: lock} ->
-                  {ast, hash} = prepare_ast_with_hash(file_path, component_name)
+  defp replace_application_name_in_imported_files(igniter) do
+    app_name_atom = Mix.Project.get!() |> Module.split() |> List.first() |> String.to_atom()
 
-                  {igniter, path} = import_to_project(igniter, ast, kind)
+    for source <- Rewrite.sources(igniter.rewrite),
+        Rewrite.Source.get(source, :path) in igniter.assigns.imported_paths,
+        reduce: igniter do
+      igniter ->
+        new_quoted =
+          source
+          |> Rewrite.Source.get(:quoted)
+          |> replace_module_prefix_to(app_name_atom)
 
-                  %{
-                    igniter: igniter,
-                    lock: lock ++ [%{path: path, hash: hash}]
-                  }
-              end
-          end
+        new_source =
+          Rewrite.Source.update(
+            source,
+            :quoted,
+            new_quoted
+          )
+
+        %{igniter | rewrite: Rewrite.update!(igniter.rewrite, new_source)}
+    end
+  end
+
+  defp add_fireside_lock(igniter, app_name) do
+    igniter =
+      for source <- Rewrite.sources(igniter.rewrite),
+          Rewrite.Source.get(source, :path) in igniter.assigns.imported_paths,
+          reduce: igniter do
+        igniter ->
+          {new_quoted, hash} =
+            source
+            |> Rewrite.Source.get(:quoted)
+            |> compute_and_include_hash(app_name)
+
+          new_source =
+            Rewrite.Source.update(
+              source,
+              :quoted,
+              new_quoted
+            )
+
+          path = Rewrite.Source.get(source, :path)
+
+          %{igniter | rewrite: Rewrite.update!(igniter.rewrite, new_source)}
+          |> Igniter.update_assign(:hashes, %{path => hash}, fn hashes ->
+            Map.merge(hashes, %{path => hash})
+          end)
       end
 
-    igniter = Igniter.create_new_elixir_file(igniter, "config/fireside.exs", transform_lock(lock))
-  end
-
-  defp transform_lock(lock) do
-    hash =
-      :crypto.hash(:sha, Enum.sort(lock) |> Enum.map(& &1.hash) |> Enum.join(""))
+    aggregate_hash =
+      :crypto.hash(
+        :sha,
+        igniter.assigns.hashes
+        |> Enum.map(& &1)
+        |> Enum.sort_by(&elem(&1, 0))
+        |> Enum.map(fn {_path, hash} -> hash end)
+        |> Enum.join("")
+      )
       |> Base.encode16()
 
-    # TODO: or update
-    quote do
-      %{
-        shopifex: %{
-          hash: unquote(hash),
-          files: unquote(lock)
-        }
-      }
-    end
-    |> Macro.to_string()
+    app_lock = %{
+      hash: aggregate_hash,
+      files: igniter.assigns.hashes
+    }
+
+    Igniter.Project.Config.configure_new(
+      igniter,
+      "fireside.exs",
+      Igniter.Project.Application.app_name(),
+      [Fireside, String.to_atom(app_name)],
+      app_lock
+    )
   end
 
-  def add_dependencies(igniter, component_path) do
-    mix_file = Path.join(component_path, "mix.exs")
-
-    unless File.exists?(mix_file) do
-      raise "mix.exs not found in the component directory"
-    end
-
-    {deps, _} =
-      mix_file
+  defp import_to_project(igniter, file_path, kind) do
+    ast =
+      file_path
       |> File.read!()
       |> Sourceror.parse_string!()
-      |> Sourceror.Zipper.zip()
-      |> Igniter.Code.Module.move_to_defp(:deps, 0)
-      |> then(fn {:ok, zipper} ->
-        case Igniter.Code.Common.move_right(zipper, &Igniter.Code.List.list?/1) do
-          {:ok, zipper} ->
-            zipper
 
-          :error ->
-            {:error, "deps/0 doesn't return a list"}
-        end
-      end)
-      |> Sourceror.Zipper.node()
-      |> Code.eval_quoted()
-
-    {Enum.reduce(deps, igniter, fn dep, igniter ->
-       {name, version, opts} =
-         case dep do
-           {_name, _version, _opts} = dep -> dep
-           {name, version} -> {name, version, []}
-         end
-
-       Igniter.Project.Deps.add_dependency(igniter, name, version, opts)
-     end), deps}
-  end
-
-  defp prepare_ast_with_hash(file_path, component_name) do
-    file_path
-    |> File.read!()
-    |> Sourceror.parse_string!()
-    |> replace_module_prefix_to_mix_project_name()
-    |> compute_and_include_hash(component_name)
-  end
-
-  defp import_to_project(igniter, ast, kind) do
     module_name = get_module_name(ast)
 
     proper_location =
@@ -202,16 +232,17 @@ defmodule Fireside.Util.Install do
           Igniter.Code.Module.proper_test_support_location(module_name)
       end
 
-    {Igniter.create_new_elixir_file(
-       igniter,
-       proper_location,
-       Sourceror.to_string(ast)
-     ), proper_location}
+    Igniter.create_new_elixir_file(
+      igniter,
+      proper_location,
+      Sourceror.to_string(ast)
+    )
+    |> Igniter.update_assign(:imported_paths, [proper_location], fn imported_paths ->
+      imported_paths ++ [proper_location]
+    end)
   end
 
-  defp replace_module_prefix_to_mix_project_name(ast) do
-    app_name_atom = Mix.Project.get!() |> Module.split() |> List.first() |> String.to_atom()
-
+  defp replace_module_prefix_to(ast, app_name_atom) do
     {:defmodule, _defmodule_meta, [{:__aliases__, _aliases_meta, [prefix | _suffix]} | _rest]} =
       ast
 
@@ -225,7 +256,7 @@ defmodule Fireside.Util.Install do
     end)
   end
 
-  defp compute_and_include_hash(ast, component_name) do
+  defp compute_and_include_hash(ast, app_name) do
     hash = :crypto.hash(:sha, Sourceror.to_string(ast)) |> Base.encode16()
 
     {Sourceror.prepend_comments(
@@ -242,7 +273,7 @@ defmodule Fireside.Util.Install do
            previous_eol_count: 1,
            next_eol_count: 1,
            text:
-             "#! DO NOT EDIT this file. Run `mix fireside.unlock #{component_name}` if you want to stop syncing."
+             "#! DO NOT EDIT this file. Run `mix fireside.unlock #{app_name}` if you want to stop syncing."
          }
        ],
        :leading
@@ -256,43 +287,32 @@ defmodule Fireside.Util.Install do
     Module.concat(module_name)
   end
 
-  defp determine_component_type_and_version(requirement) do
+  defp determine_app_type_and_version(requirement) do
     case String.split(requirement, "@", trim: true) do
-      [_component] ->
-        raise "only @path components are currently supported"
+      [_app] ->
+        raise "only @path apps are currently supported"
 
-      [component, version] ->
+      [app, version] ->
         case version do
           "git:" <> _requirement ->
-            raise "@git components are not yet supported"
+            raise "@git apps are not yet supported"
 
           "github:" <> _requirement ->
-            raise "@github components are not yet supported"
+            raise "@github apps are not yet supported"
 
           "path:" <> requirement ->
             [path: requirement]
 
           _version ->
-            raise "only @path components are currently supported"
+            raise "only @path apps are currently supported"
         end
         |> case do
           :error ->
             :error
 
           requirement ->
-            {component, requirement}
+            {app, requirement}
         end
     end
-  end
-
-  # borrowed from mix format
-  defp eval_file_with_keyword_list(path) do
-    {opts, _} = Code.eval_file(path)
-
-    unless Keyword.keyword?(opts) do
-      Mix.raise("Expected #{inspect(path)} to return a keyword list, got: #{inspect(opts)}")
-    end
-
-    opts
   end
 end
