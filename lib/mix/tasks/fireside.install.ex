@@ -1,6 +1,6 @@
 defmodule Mix.Tasks.Fireside.Install do
   @moduledoc """
-  Install a package or packages, and run any associated installers.
+  Install a Fireside component.
 
   ## Args
 
