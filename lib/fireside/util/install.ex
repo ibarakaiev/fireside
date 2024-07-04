@@ -8,43 +8,36 @@ defmodule Fireside.Util.Install do
       raise "directory `#{app_path}` doesn't exist"
     end
 
-    fireside_config = get_fireside_app_config(app_path)
+    fireside_module_path = Path.join(app_path, "/fireside.exs")
 
-    expanded_fireside_includes = expand_fireside_includes(app_path, fireside_config)
+    if not File.exists?(fireside_module_path) do
+      raise "#{app_path} is not a Fireside app, aborting."
+    end
+
+    fireside_module = load_module(fireside_module_path)
+
+    expanded_fireside_includes = expand_fireside_includes(app_path, fireside_module.config())
 
     Igniter.new()
-    # |> install_dependencies(app_path)
+    |> install_dependencies(app_path)
     |> install_code(expanded_fireside_includes)
-    |> run_installer(app_name)
-    |> replace_application_name_in_imported_files()
+    |> fireside_module.setup()
+    |> replace_application_name(fireside_module)
     |> add_fireside_lock(app_name)
     |> Igniter.do_or_dry_run([])
 
     :ok
   end
 
-  # TODO: verify the config
-  defp get_fireside_app_config(app_path) do
-    fireside_config_path = Path.join(app_path, "/fireside.exs")
+  defp load_module(path) do
+    Code.require_file(path)
 
-    if not File.exists?(fireside_config_path) do
-      raise "#{app_path} is not a Fireside app, aborting."
-    end
-
-    # TODO: support non-static map definitions
-    {config, _} =
-      fireside_config_path
+    {:defmodule, _defmodule_meta, [{:__aliases__, _aliases_meta, module_name} | _rest]} =
+      path
       |> File.read!()
       |> Sourceror.parse_string!()
-      |> Sourceror.Zipper.zip()
-      |> Igniter.Code.Module.move_to_def(:app, 0)
-      |> then(fn {:ok, zipper} ->
-        zipper
-        |> Sourceror.Zipper.node()
-        |> Code.eval_quoted()
-      end)
 
-    config
+    Module.concat(module_name)
   end
 
   defp expand_fireside_includes(app_path, fireside_config) do
@@ -134,21 +127,19 @@ defmodule Fireside.Util.Install do
     end
   end
 
-  defp run_installer(igniter, app_name) do
-    Igniter.compose_task(igniter, "mix #{app_name}.install", [])
-  end
+  defp replace_application_name(igniter, fireside_module) do
+    igniter = Igniter.include_glob(igniter, "{lib,test}/**/*.{ex,exs}")
 
-  defp replace_application_name_in_imported_files(igniter) do
-    app_name_atom = Mix.Project.get!() |> Module.split() |> List.first() |> String.to_atom()
+    fireside_module_prefix = fireside_module |> Module.split() |> List.first() |> String.to_atom()
+    new_app_prefix = Mix.Project.get!() |> Module.split() |> List.first() |> String.to_atom()
 
     for source <- Rewrite.sources(igniter.rewrite),
-        Rewrite.Source.get(source, :path) in igniter.assigns.imported_paths,
         reduce: igniter do
       igniter ->
         new_quoted =
           source
           |> Rewrite.Source.get(:quoted)
-          |> replace_module_prefix_to(app_name_atom)
+          |> replace_module_prefix_from_to(fireside_module_prefix, new_app_prefix)
 
         new_source =
           Rewrite.Source.update(
@@ -242,14 +233,11 @@ defmodule Fireside.Util.Install do
     end)
   end
 
-  defp replace_module_prefix_to(ast, app_name_atom) do
-    {:defmodule, _defmodule_meta, [{:__aliases__, _aliases_meta, [prefix | _suffix]} | _rest]} =
-      ast
-
+  defp replace_module_prefix_from_to(ast, old_prefix, new_prefix) do
     ast
     |> Macro.prewalk(fn
-      {:__aliases__, aliases_meta, [^prefix | rest]} ->
-        {:__aliases__, aliases_meta, [app_name_atom | rest]}
+      {:__aliases__, aliases_meta, [^old_prefix | rest]} ->
+        {:__aliases__, aliases_meta, [new_prefix | rest]}
 
       node ->
         node
