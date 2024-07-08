@@ -93,7 +93,7 @@ defmodule Fireside.Util.Install do
             {name, version} -> {name, version, []}
           end
 
-        Igniter.Project.Deps.add_dependency(igniter, name, version, opts)
+        Igniter.Project.Deps.add_dep(igniter, {name, version}, opts ++ [append?: true])
       end)
 
     igniter = Igniter.apply_and_fetch_dependencies(igniter, error_on_abort?: true)
