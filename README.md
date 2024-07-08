@@ -61,7 +61,7 @@ project with Fireside. The Fireside installer will take the following steps:
 3. Run `MyApp.FiresideComponent.setup/1` for optional custom code modification.
 4. Replace `MyApp` across the entire project with the prefix of your
    application.
-5. Calculate the hash of each imported file (except the files listed
+5. Calculate the hash of each imported file (except the files listed as
    `overwritable`) and add it to its top, with a note that the file should not
    be changed manually.
 6. Calculate the aggregate hash (hash of all hashes) and add it to
@@ -101,7 +101,8 @@ or change it to the most recent version on Github in Fireside's `mix.exs`.
 ### Planned tasks
 
 - **`fireside.init`**: creates a `fireside.exs` in the root of the project.
-  Will potentially include smart logic to guess its contents as well.
+  Will potentially include smart logic to guess its contents as well. This
+  should be run only when developing a component.
 - **`fireside.install {app_name}@github:..`** or **`fireside.install {app_name}@git:..`**:
   installs a Fireside component from a Git reference or from Github.
 - **`fireside.install {app_name}@{version}`**: installs a Fireside component
@@ -112,7 +113,8 @@ or change it to the most recent version on Github in Fireside's `mix.exs`.
   becomes a regular part of the source code and Fireside will no longer be able
   to identify, track, and update it.
 - **`fireside.install .. --unlocked`**: same as **`fireside.install`** but
-  without locking the component.
+  without locking the component. This can be useful if there are no plans to
+  fetch changes from the upstream.
 - **`fireside.delete {app_name}`**: completely removes the installed component
   from the project. Note: installed dependencies will remain in `mix.exs` and
   will need to be manually removed.
@@ -134,8 +136,9 @@ centralize it, but it didn't make sense to make it a library or an API. In my
 case, I was using [Ash](https://hexdocs.pm/ash), and it would be cumbersome (if
 not impossible) to plug in Ash resource definitions into my existing
 application without having it be a separate child in the supervision tree with
-its own `Repo` module. If you are not familiar with what Ash is, think moving
-[Ecto](https://hexdocs.pm/ecto) schemas and contexts into a library.
+its own `Repo` module (assuming I'd build a library instead). If you are not
+familiar with what Ash is, think moving [Ecto](https://hexdocs.pm/ecto) schemas
+and contexts into a library.
 
 There are just certain application logic components that can
 (and maybe should) be centralized and yet cannot be a library. Typically, they
@@ -145,24 +148,21 @@ reuse application logic by _embedding_ it within your Elixir monolith and still
 have all the benefits like version upgrades without additional engineering
 overhead.
 
-## Why does Fireside not exist yet?
+Fireside's implementation in Elixir is possible thanks to @ZachDaniel's ongoing
+work on [Igniter](https://hexdocs.pm/igniter), which powers most of Fireside,
+allowing for smart, composable code generation and modification.
 
-I think the reason why it can exist specifically in the Elixir ecosystem is
-because Erlang/OTP is pretty much the only platform that I know of where you
-can build an arbitrarily large well-designed monolithic app scaled
-horizontally including even machine learning logic with [Nx](https://hexdocs.pm/nx),
-[Axon](https://hexdocs.pm/axon), [Bumblebee](https://hexdocs.pm/bumblebee),
-etc. An alternative that comes to mind is Ruby on Rails, but Ruby is an
-object-oriented language, so you would have to deal with mutability
-constraints as well as lack of metaprogramming.
+## Why does Fireside not exist in other languages?
 
-Elixir is also one of the few standardized ecosystems with common conventions
-that pretty much everyone follows
+Elixir/Phoenix/OTP is one of the few standardized ecosystems with common
+conventions that allows creating an arbitrarily large distributed monolith with
+a solid foundation
 ([a slide from Sasa Juric's talk](https://www.reddit.com/r/elixir/comments/gpdlp4/the_more_i_learn_about_elixir_the_more_i_realize/)
-comes to mind). This allows writing code that can easily be reused across companies
-(compare this to the JavaScript or Python ecosystem with a million different
-options to just install a package...).
+comes to mind). This allows writing code that can easily be reused across teams
+and companies (compare this to the JavaScript or Python ecosystem with a
+million different options to just install a package...).
 
-Finally, it is also possible thanks to @ZachDaniel's ongoing work on
-[Igniter](https://hexdocs.pm/igniter), which powers most of Fireside, allowing
-for smart, composable code generation and modification.
+Additionally, Elixir is an immutable language that supports metaprogramming.
+In its closest spiritual relative and its ecosystem, Ruby and Ruby on Rails,
+Fireside would probably not be possible due to mutability concerns and lack of
+metaprogramming.
