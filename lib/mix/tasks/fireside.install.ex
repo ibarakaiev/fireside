@@ -1,19 +1,19 @@
 defmodule Mix.Tasks.Fireside.Install do
   @moduledoc """
-  Install a Fireside component.
+  Install a Fireside app.
 
   ## Args
 
-  mix fireside.install component
+  mix fireside.install `app`
 
   ## Package formats
 
-  * `package@path:path/to/dep` - The package will be installed from the specified path.
+  * `app@path:path/to/app` - The app will be installed from the specified path.
   """
   use Mix.Task
 
   @impl true
-  @shortdoc "Install a package or packages, and run any associated installers."
+  @shortdoc "Install a Fireside app."
   def run(argv) do
     if length(argv) != 1 do
       raise ArgumentError, "must provide exactly one component to install"
