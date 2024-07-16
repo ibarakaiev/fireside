@@ -71,7 +71,7 @@ defmodule Fireside.Util.Install do
       |> File.read!()
       |> Sourceror.parse_string!()
       |> Sourceror.Zipper.zip()
-      |> Igniter.Code.Module.move_to_defp(:deps, 0)
+      |> Igniter.Code.Function.move_to_defp(:deps, 0)
       |> then(fn {:ok, zipper} ->
         case Igniter.Code.Common.move_right(zipper, &Igniter.Code.List.list?/1) do
           {:ok, zipper} ->
@@ -84,7 +84,10 @@ defmodule Fireside.Util.Install do
       |> Sourceror.Zipper.node()
       |> Code.eval_quoted()
 
-    desired_tasks = Enum.map(deps, &"#{elem(&1, 0)}.install")
+    desired_tasks =
+      deps
+      |> Enum.reject(&(elem(&1, 0) == :igniter))
+      |> Enum.map(&"#{elem(&1, 0)}.install")
 
     igniter =
       Enum.reduce(deps, igniter, fn dep, igniter ->
@@ -99,20 +102,9 @@ defmodule Fireside.Util.Install do
 
     igniter = Igniter.apply_and_fetch_dependencies(igniter, error_on_abort?: true)
 
-    igniter_tasks =
-      Mix.Task.load_all()
-      |> Stream.map(fn item ->
-        Code.ensure_compiled!(item)
-        item
-      end)
-      |> Stream.filter(&Igniter.Util.Install.implements_behaviour?(&1, Igniter.Mix.Task))
-      |> Enum.filter(&(Mix.Task.task_name(&1) in desired_tasks))
-      |> Enum.sort_by(
-        &Enum.find_index(desired_tasks, fn e -> e == Mix.Task.task_name(&1) end),
-        &<=/2
-      )
-
-    igniter_tasks
+    desired_tasks
+    |> Enum.map(&Mix.Task.get/1)
+    |> Enum.filter(& &1)
     |> Enum.reduce(igniter, fn task, igniter ->
       Igniter.compose_task(igniter, task, [])
     end)
