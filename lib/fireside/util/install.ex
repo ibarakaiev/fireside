@@ -15,16 +15,19 @@ defmodule Fireside.Util.Install do
     end
 
     fireside_module = load_module(fireside_module_path)
+    fireside_module_prefix = fireside_module |> Module.split() |> List.first() |> String.to_atom()
+    project_prefix = Mix.Project.get!() |> Module.split() |> List.first() |> String.to_atom()
 
     expanded_fireside_includes =
       expand_fireside_includes(component_path, fireside_module.config())
 
     Igniter.new()
     |> install_dependencies(component_path)
-    |> install_code(expanded_fireside_includes)
+    |> install_code(expanded_fireside_includes, fireside_module_prefix, project_prefix)
     |> fireside_module.setup()
-    |> replace_component_name(fireside_module)
+    |> replace_component_name(fireside_module_prefix, project_prefix)
     |> add_fireside_lock(component_name)
+    |> Igniter.Code.Module.move_files()
     |> Igniter.do_or_dry_run([])
 
     :ok
@@ -84,47 +87,27 @@ defmodule Fireside.Util.Install do
       |> Sourceror.Zipper.node()
       |> Code.eval_quoted()
 
-    desired_tasks =
-      deps
-      |> Enum.reject(&(elem(&1, 0) == :igniter))
-      |> Enum.map(&"#{elem(&1, 0)}.install")
+    deps
+    |> Enum.reject(&(elem(&1, 0) == :igniter))
+    |> Igniter.Util.Install.install([], igniter, append?: true)
 
-    igniter =
-      Enum.reduce(deps, igniter, fn dep, igniter ->
-        {name, version, opts} =
-          case dep do
-            {_name, _version, _opts} = dep -> dep
-            {name, version} -> {name, version, []}
-          end
-
-        Igniter.Project.Deps.add_dep(igniter, {name, version}, opts ++ [append?: true])
-      end)
-
-    igniter = Igniter.apply_and_fetch_dependencies(igniter, error_on_abort?: true)
-
-    desired_tasks
-    |> Enum.map(&Mix.Task.get/1)
-    |> Enum.filter(& &1)
-    |> Enum.reduce(igniter, fn task, igniter ->
-      Igniter.compose_task(igniter, task, [])
-    end)
+    Igniter.new()
   end
 
-  defp install_code(igniter, expanded_fireside_includes) do
+  defp install_code(igniter, expanded_fireside_includes, fireside_module_prefix, project_prefix) do
     for kind <- [:lib, :tests, :test_supports], reduce: igniter do
       igniter ->
         for path <- expanded_fireside_includes[kind], reduce: igniter do
           igniter ->
-            import_to_project(igniter, path, kind)
+            import_to_project(igniter, path, kind, fireside_module_prefix, project_prefix)
         end
     end
   end
 
-  defp replace_component_name(igniter, fireside_module) do
+  # the setup() hook might introduce additional references to the Fireside module prefix,
+  # so this needs to be done again
+  defp replace_component_name(igniter, fireside_module_prefix, project_prefix) do
     igniter = Igniter.include_glob(igniter, "{lib,test}/**/*.{ex,exs}")
-
-    fireside_module_prefix = fireside_module |> Module.split() |> List.first() |> String.to_atom()
-    new_app_prefix = Mix.Project.get!() |> Module.split() |> List.first() |> String.to_atom()
 
     for source <- Rewrite.sources(igniter.rewrite),
         reduce: igniter do
@@ -132,7 +115,7 @@ defmodule Fireside.Util.Install do
         new_quoted =
           source
           |> Rewrite.Source.get(:quoted)
-          |> replace_module_prefix_from_to(fireside_module_prefix, new_app_prefix)
+          |> replace_module_prefix_from_to(fireside_module_prefix, project_prefix)
 
         new_source =
           Rewrite.Source.update(
@@ -196,11 +179,12 @@ defmodule Fireside.Util.Install do
     )
   end
 
-  defp import_to_project(igniter, file_path, kind) do
+  defp import_to_project(igniter, file_path, kind, fireside_module_prefix, project_prefix) do
     ast =
       file_path
       |> File.read!()
       |> Sourceror.parse_string!()
+      |> replace_module_prefix_from_to(fireside_module_prefix, project_prefix)
 
     module_name = get_module_name(ast)
 
@@ -215,6 +199,10 @@ defmodule Fireside.Util.Install do
         :test_supports ->
           Igniter.Code.Module.proper_test_support_location(module_name)
       end
+
+    if File.exists?(proper_location) do
+      raise "Conflicting file #{proper_location} already exists, aborting. If you are trying to update a Fireside component, use fireside.update instead."
+    end
 
     Igniter.create_new_elixir_file(
       igniter,
