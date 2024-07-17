@@ -19,7 +19,7 @@ defmodule Fireside.MixProject do
 
   defp deps do
     [
-      {:igniter, "~> 0.3"}
+      {:igniter, path: "../igniter", override: true}
     ]
   end
 end
