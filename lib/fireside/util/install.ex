@@ -1,8 +1,19 @@
 defmodule Fireside.Util.Install do
   def install(component) do
-    Mix.shell().info("Installing #{component}")
+    igniter = Igniter.new()
 
     {component_name, [path: component_path]} = determine_component_type_and_version(component)
+
+    if Igniter.Project.Config.configures?(
+         igniter,
+         "fireside.exs",
+         [Fireside, component_name],
+         Igniter.Project.Application.app_name()
+       ) do
+      raise "#{component_name} is already installed. Use `fireside.update #{component_name}` to update it instead."
+    end
+
+    Mix.shell().info("Installing #{component}")
 
     if not File.dir?(component_path) do
       raise "directory `#{component_path}` doesn't exist"
@@ -21,12 +32,12 @@ defmodule Fireside.Util.Install do
     expanded_fireside_includes =
       expand_fireside_includes(component_path, fireside_module.config())
 
-    Igniter.new()
+    igniter
     |> install_dependencies(component_path)
     |> install_code(expanded_fireside_includes, fireside_module_prefix, project_prefix)
     |> fireside_module.setup()
     |> replace_component_name(fireside_module_prefix, project_prefix)
-    |> add_fireside_lock(component_name)
+    |> add_fireside_lock(component_name, component_path)
     |> Igniter.Code.Module.move_files()
     |> Igniter.do_or_dry_run([])
 
@@ -128,7 +139,7 @@ defmodule Fireside.Util.Install do
     end
   end
 
-  defp add_fireside_lock(igniter, component_name) do
+  defp add_fireside_lock(igniter, component_name, component_path) do
     igniter =
       for source <- Rewrite.sources(igniter.rewrite),
           Rewrite.Source.get(source, :path) in igniter.assigns.imported_paths,
@@ -166,6 +177,8 @@ defmodule Fireside.Util.Install do
       |> Base.encode16()
 
     component_lock = %{
+      source: :path,
+      origin: component_path,
       hash: aggregate_hash,
       files: igniter.assigns.hashes
     }
