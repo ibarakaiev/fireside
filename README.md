@@ -70,8 +70,9 @@ project with Fireside. The Fireside installer will take the following steps:
 At this point, the component should become a native part of the existing Elixir
 application. If its version is updated remotely, Fireside will be able to
 replace all relevant parts as long as the hashes of their AST do not differ
-from their originals. If at any point the component is no longer necessary, it
-can be removed with `mix fireside.delete my_app`. If it is no longer sufficient
+from their originals by running `igniter.update my_app`. If at any point the
+component is no longer necessary, it can be removed with
+`mix fireside.delete my_app`. If it is no longer sufficient
 and needs to be extended/customized, it should be unlocked with
 `mix fireside.unlock my_app` and all the files will become as if they never
 were a Fireside component to begin with. If they are modified without
@@ -97,6 +98,8 @@ or change it to the most recent version on Github in Fireside's `mix.exs`.
 
 - **`fireside.install {app_name}@path:..`**: installs an existing
   Fireside component under specified path.
+- **`fireside.update {app_name}`**: updates an installed Fireside component
+  to reflect all changes upstream.
 
 ### Planned tasks
 
