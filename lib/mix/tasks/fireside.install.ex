@@ -6,9 +6,9 @@ defmodule Mix.Tasks.Fireside.Install do
 
   mix fireside.install `component`
 
-  ## Package formats
+  ## Supported formats
 
-  * `component@path:path/to/component` - The component will be installed from the specified path.
+  * `component` - The component will be installed from the specified path.
   """
   use Mix.Task
 
