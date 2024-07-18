@@ -37,7 +37,6 @@ defmodule Fireside.Util.Install do
     igniter
     |> install_dependencies(component_path)
     |> Igniter.assign(:overwritable_paths, [])
-    |> check_conflicts(expanded_fireside_includes)
     |> install_code(
       expanded_fireside_includes,
       fireside_module_prefix,
@@ -87,16 +86,6 @@ defmodule Fireside.Util.Install do
     Igniter.new()
   end
 
-  defp check_conflicts(igniter, expanded_fireside_includes) do
-    for kind <- [:lib, :tests, :test_supports] do
-      for path <- expanded_fireside_includes[kind] do
-        if Igniter.exists?(igniter, path) do
-          raise "Conflicting file #{path} already exists, aborting."
-        end
-      end
-    end
-  end
-
   defp install_code(
          igniter,
          expanded_fireside_includes,
@@ -123,7 +112,7 @@ defmodule Fireside.Util.Install do
   # the setup() hook might introduce additional references to the Fireside module prefix,
   # so this needs to be done again
   defp replace_component_name(igniter, fireside_module_prefix, project_prefix) do
-    igniter = Igniter.include_glob(igniter, "{lib,test}/**/*.{ex,exs}")
+    igniter = Igniter.include_all_elixir_files(igniter)
 
     for source <- Rewrite.sources(igniter.rewrite),
         reduce: igniter do
@@ -150,8 +139,11 @@ defmodule Fireside.Util.Install do
         kind,
         fireside_module_prefix,
         project_prefix,
-        overwritable_paths
+        overwritable_paths,
+        opts \\ []
       ) do
+    check_for_conflicts? = Keyword.get(opts, :check_for_conflicts?, true)
+
     ast =
       file_path
       |> File.read!()
@@ -171,6 +163,10 @@ defmodule Fireside.Util.Install do
         :test_supports ->
           Igniter.Code.Module.proper_test_support_location(module_name)
       end
+
+    if check_for_conflicts? && Igniter.exists?(igniter, proper_location) do
+      raise "Conflicting file #{proper_location} already exists, aborting."
+    end
 
     igniter
     |> Igniter.create_or_update_elixir_file(

@@ -18,6 +18,7 @@ defmodule Fireside.Util.Update do
     igniter
     |> check_integrity(component_config)
     |> Igniter.assign(:overwritable_paths, [])
+    # TODO: add dependency updates
     |> reimport_files(component_name, component_config)
     |> delete_no_longer_used_files(component_config)
     |> Igniter.do_or_dry_run([])
@@ -98,7 +99,8 @@ defmodule Fireside.Util.Update do
               kind,
               fireside_module_prefix,
               project_prefix,
-              overwritable_paths
+              overwritable_paths,
+              check_for_conflicts?: false
             )
         end
     end
