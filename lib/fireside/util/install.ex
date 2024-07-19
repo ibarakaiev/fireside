@@ -2,6 +2,8 @@ defmodule Fireside.Util.Install do
   @moduledoc false
 
   def install(component) do
+    Fireside.ensure_clean_git!()
+
     igniter = Igniter.new()
 
     {component_name, [path: component_path]} = determine_component_type_and_version(component)

@@ -1,7 +1,12 @@
 defmodule Fireside do
-  @moduledoc """
-  Documentation for `Fireside`.
-  """
+  @moduledoc false
+
+  def ensure_clean_git!() do
+    unless match?({"", 0}, System.cmd("git", ["status", "--porcelain"])) do
+      raise "Please stage or stash your current Git changes before continuing."
+    end
+  end
+
   def calculate_hash(ast) do
     :crypto.hash(:sha, Sourceror.to_string(ast)) |> Base.encode16()
   end
