@@ -141,11 +141,8 @@ defmodule Fireside.Util.Install do
         kind,
         fireside_module_prefix,
         project_prefix,
-        overwritable_paths,
-        opts \\ []
+        overwritable_paths
       ) do
-    check_for_conflicts? = Keyword.get(opts, :check_for_conflicts?, true)
-
     ast =
       file_path
       |> File.read!()
@@ -166,7 +163,8 @@ defmodule Fireside.Util.Install do
           Igniter.Code.Module.proper_test_support_location(module_name)
       end
 
-    if check_for_conflicts? && Igniter.exists?(igniter, proper_location) do
+    if Igniter.exists?(igniter, proper_location) and
+         proper_location not in (igniter.assigns[:fireside_managed_files] || []) do
       raise "Conflicting file #{proper_location} already exists, aborting."
     end
 

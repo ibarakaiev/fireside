@@ -45,6 +45,17 @@ defmodule Fireside.Util.Update do
   end
 
   defp reimport_files(igniter, component_name, component_config) do
+    igniter =
+      for {file_path, _hash} <- component_config[:files], reduce: igniter do
+        igniter ->
+          Igniter.update_assign(
+            igniter,
+            :fireside_managed_files,
+            [file_path],
+            fn fireside_managed_files -> fireside_managed_files ++ [file_path] end
+          )
+      end
+
     case component_config[:source] do
       :path ->
         component_path = component_config[:origin]
@@ -99,8 +110,7 @@ defmodule Fireside.Util.Update do
               kind,
               fireside_module_prefix,
               project_prefix,
-              overwritable_paths,
-              check_for_conflicts?: false
+              overwritable_paths
             )
         end
     end
