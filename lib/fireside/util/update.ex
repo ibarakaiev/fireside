@@ -25,7 +25,7 @@ defmodule Fireside.Util.Update do
   end
 
   defp check_integrity(igniter, component_config) do
-    for {file_path, hash} <- component_config.files do
+    for {file_path, hash} <- component_config[:files] do
       if Igniter.exists?(igniter, file_path) do
         source =
           igniter.rewrite
@@ -45,9 +45,9 @@ defmodule Fireside.Util.Update do
   end
 
   defp reimport_files(igniter, component_name, component_config) do
-    case component_config.source do
+    case component_config[:source] do
       :path ->
-        component_path = component_config.origin
+        component_path = component_config[:origin]
 
         if not File.dir?(component_path) do
           raise "#{component_name}'s source directory `#{component_path}` no longer exists"
@@ -108,7 +108,7 @@ defmodule Fireside.Util.Update do
 
   # WARN:Igniter currently doesn't support deleting files, so this won't show up in the diff
   defp delete_no_longer_used_files(igniter, component_config) do
-    for {file_path, _hash} <- component_config.files,
+    for {file_path, _hash} <- component_config[:files],
         file_path not in igniter.assigns.imported_paths,
         reduce: igniter do
       igniter ->

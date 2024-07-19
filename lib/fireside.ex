@@ -33,18 +33,26 @@ defmodule Fireside do
           end)
       end
 
-    component_lock = %{
-      source: :path,
-      origin: component_path,
-      files: igniter.assigns.hashes
-    }
+    app_name = Igniter.Project.Application.app_name()
 
-    Igniter.Project.Config.configure(
-      igniter,
+    igniter
+    |> Igniter.Project.Config.configure_new(
       "fireside.exs",
-      Igniter.Project.Application.app_name(),
-      [Fireside, component_name],
-      component_lock
+      app_name,
+      [Fireside, component_name, :source],
+      :path
+    )
+    |> Igniter.Project.Config.configure_new(
+      "fireside.exs",
+      app_name,
+      [Fireside, component_name, :origin],
+      component_path
+    )
+    |> Igniter.Project.Config.configure(
+      "fireside.exs",
+      app_name,
+      [Fireside, component_name, :files],
+      igniter.assigns.hashes
     )
   end
 
