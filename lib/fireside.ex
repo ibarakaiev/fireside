@@ -73,7 +73,9 @@ defmodule Fireside do
   end
 
   def expand_fireside_includes(component_path, fireside_config) do
-    for kind <- [:lib, :tests, :test_supports, :overwritable], reduce: %{} do
+    for kind <- [:lib, :tests, :test_supports, :overwritable],
+        Map.has_key?(fireside_config, kind),
+        reduce: %{} do
       expanded_includes ->
         includes = fireside_config[kind]
 

@@ -17,7 +17,7 @@ defmodule Fireside.Util.Install do
       raise "#{component_name} is already installed. Use `fireside.update #{component_name}` to update it instead."
     end
 
-    Mix.shell().info("Installing #{component}...")
+    Mix.shell().info("Installing #{component}")
 
     if not File.dir?(component_path) do
       raise "directory `#{component_path}` doesn't exist"
@@ -194,10 +194,30 @@ defmodule Fireside.Util.Install do
   end
 
   defp replace_module_prefix_from_to(ast, old_prefix, new_prefix) do
+    old_prefix_str = Atom.to_string(old_prefix)
+    new_prefix_str = Atom.to_string(new_prefix)
+
     ast
     |> Macro.prewalk(fn
-      {:__aliases__, aliases_meta, [^old_prefix | rest]} ->
-        {:__aliases__, aliases_meta, [new_prefix | rest]}
+      {:__aliases__, aliases_meta, [prefix | rest]} when is_atom(prefix) ->
+        prefix_str = Atom.to_string(prefix)
+
+        if String.starts_with?(prefix_str, old_prefix_str) do
+          replaced_prefix =
+            prefix_str
+            |> String.replace_prefix(old_prefix_str, new_prefix_str)
+            |> String.to_atom()
+
+          {:__aliases__, aliases_meta,
+           [
+             replaced_prefix
+             | rest
+           ]}
+
+          {:__aliases__, aliases_meta, [replaced_prefix | rest]}
+        else
+          {:__aliases__, aliases_meta, [prefix | rest]}
+        end
 
       node ->
         node

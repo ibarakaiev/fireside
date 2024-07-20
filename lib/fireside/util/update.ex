@@ -85,7 +85,7 @@ defmodule Fireside.Util.Update do
           expanded_fireside_includes,
           fireside_module_prefix,
           project_prefix,
-          expanded_fireside_includes[:overwritable]
+          Map.get(expanded_fireside_includes, :overwritable, [])
         )
         |> Fireside.add_or_replace_fireside_lock(component_name, component_path)
     end
@@ -101,7 +101,7 @@ defmodule Fireside.Util.Update do
     for kind <- [:lib, :tests, :test_supports], reduce: igniter do
       igniter ->
         for path <- expanded_fireside_includes[kind],
-            path not in expanded_fireside_includes.overwritable,
+            path not in overwritable_paths,
             reduce: igniter do
           igniter ->
             Fireside.Util.Install.import_to_project(
