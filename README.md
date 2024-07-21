@@ -1,10 +1,10 @@
 # Fireside
 
-Fireside is a (yet unreleased) Elixir library to install and maintain
+Fireside is an Elixir library to install and maintain
 self-contained application logic in your existing Elixir application with smart
 code generation and Abstract Syntax Tree (AST) hashing.
-Since the project is currently unreleased, its core functionality may change
-unexpectedly. It uses [Igniter](https://hexdocs.pm/igniter) under
+Since the project is still in its early stages, its core functionality may
+change unexpectedly. It uses [Igniter](https://hexdocs.pm/igniter) under
 the hood to orchestrate code generation and modifications, which means that
 it's possible to hook into it and add advanced generation steps such as
 adding configuration to `config/config.exs`, adding a new child to the
@@ -12,6 +12,16 @@ application supervision tree, etc. Igniter itself uses
 [`Sourceror.Zipper`](https://hexdocs.pm/sourceror/zippers.html),
 so it is possible to do anything that Elixir's metaprogramming tools support,
 but is probably unnecessary in most cases.
+
+## Installation
+
+```elixir
+def deps do
+  [
+    {:fireside, "~> 0.0.1", only: :dev, runtime: false}
+  ]
+end
+```
 
 ## What is a Fireside component?
 
@@ -64,18 +74,16 @@ project with Fireside. The Fireside installer will take the following steps:
 5. Calculate the hash of each imported file (except the files listed as
    `overwritable`) and add it to its top, with a note that the file should not
    be changed manually.
-6. Calculate the aggregate hash (hash of all hashes) and add it to
-   `config/fireside.exs` alongside individual generated file paths and hashes.
 
 At this point, the component should become a native part of the existing Elixir
 application. If its version is updated remotely, Fireside will be able to
 replace all relevant parts as long as the hashes of their AST do not differ
-from their originals by running `igniter.update my_app`. If at any point the
+from their originals by running `fireside.update my_app`. If at any point the
 component is no longer necessary, it can be removed with
 `mix fireside.delete my_app`. If it is no longer sufficient
 and needs to be extended/customized, it should be unlocked with
-`mix fireside.unlock my_app` and all the files will become as if they never
-were a Fireside component to begin with. If they are modified without
+`mix fireside.unlock my_app` and all the files will become as if they were
+never a Fireside component to begin with. If they are modified without
 unlocking, Fireside will no longer be able to update them in the future,
 and the generated files will contain a no-longer-useful notice that they should
 not be modified.
@@ -83,14 +91,12 @@ not be modified.
 ### Example application
 
 To see an example Fireside component, check out [Shopifex](https://github.com/ibarakaiev/shopifex),
-a mini component to provide the backbone for an e-commerce online store.
+a component that provides the backbone for an e-commerce online store.
 If you want to test it out, create a new Mix project with
 `mix new fireside_playground --sup`, clone Shopifex alongside it (in the same
-parent directory), add `{:fireside, path: "../fireside"}` to `mix.exs` of
+parent directory), add `{:fireside, "~> 0.0.1"}` to `mix.exs` of
 `FiresidePlayground` and then run
-`mix fireside.install shopifex@path:../shopifex`. Note: Fireside currently
-depends on a local version of Igniter, so you should have that locally as well,
-or change it to the most recent version on Github in Fireside's `mix.exs`.
+`mix fireside.install shopifex@path:../shopifex`.
 
 ## Tasks
 
@@ -133,27 +139,21 @@ components could be monetized as well.
 
 ## Why does Fireside exist?
 
-First and foremost, I built it for myself. I found myself having to maintain
-two separate codebases with shared core functionality. It made sense to
-centralize it, but it didn't make sense to make it a library or an API. In my
-case, I was using [Ash](https://hexdocs.pm/ash), and it would be cumbersome (if
-not impossible) to plug in Ash resource definitions into my existing
-application without having it be a separate child in the supervision tree with
-its own `Repo` module (assuming I'd build a library instead). If you are not
-familiar with what Ash is, think moving [Ecto](https://hexdocs.pm/ecto) schemas
-and contexts into a library.
+There are certain application logic components that can (and maybe should)
+be centralized and yet don't necessarily make sense to be a library
+(i.e. if they depend on a database). Typically, they become a SaaS, either
+self-hosted or paid for as a service, and require setting up communication
+channels, adding unnecessary complexity.
 
-There are just certain application logic components that can
-(and maybe should) be centralized and yet cannot be a library. Typically, they
-become a SaaS, either self-hosted or paid for as a service.
 Fireside hopes to provide an alternative by making it as easy as possible to
 reuse application logic by _embedding_ it within your Elixir monolith and still
 have all the benefits like version upgrades without additional engineering
 overhead.
 
-Fireside's implementation in Elixir is possible thanks to @ZachDaniel's ongoing
-work on [Igniter](https://hexdocs.pm/igniter), which powers most of Fireside,
-allowing for smart, composable code generation and modification.
+Fireside's implementation in Elixir is possible thanks to
+[@ZachDaniel](https://github.com/zachdaniel)'s ongoing work on
+[Igniter](https://hexdocs.pm/igniter), which powers most of Fireside, allowing
+for smart, composable code generation and modification.
 
 ## Why does Fireside not exist in other languages?
 

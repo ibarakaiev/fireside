@@ -1,4 +1,5 @@
 defmodule Fireside.Util.Update do
+  @moduledoc false
   require Igniter.Code.Function
 
   def update(component_name) do
