@@ -40,13 +40,14 @@ defmodule Fireside.Util.Install do
     |> install_dependencies(component_path)
     |> Igniter.assign(:overwritable_paths, [])
     |> install_code(
+      component_name,
       expanded_fireside_includes,
       fireside_module_prefix,
       project_prefix,
       expanded_fireside_includes[:overwritable]
     )
     |> fireside_module.setup()
-    |> replace_component_name(fireside_module_prefix, project_prefix)
+    |> replace_component_name(component_name, fireside_module_prefix, project_prefix)
     |> Fireside.add_or_replace_fireside_lock(
       component_name,
       component_path
@@ -90,6 +91,7 @@ defmodule Fireside.Util.Install do
 
   defp install_code(
          igniter,
+         component_name,
          expanded_fireside_includes,
          fireside_module_prefix,
          project_prefix,
@@ -101,6 +103,7 @@ defmodule Fireside.Util.Install do
           igniter ->
             import_to_project(
               igniter,
+              component_name,
               path,
               kind,
               fireside_module_prefix,
@@ -113,7 +116,7 @@ defmodule Fireside.Util.Install do
 
   # the setup() hook might introduce additional references to the Fireside module prefix,
   # so this needs to be done again
-  defp replace_component_name(igniter, fireside_module_prefix, project_prefix) do
+  defp replace_component_name(igniter, component_name, fireside_module_prefix, project_prefix) do
     igniter = Igniter.include_all_elixir_files(igniter)
 
     for source <- Rewrite.sources(igniter.rewrite),
@@ -123,6 +126,7 @@ defmodule Fireside.Util.Install do
           source
           |> Rewrite.Source.get(:quoted)
           |> replace_module_prefix_from_to(fireside_module_prefix, project_prefix)
+          |> replace_app_name(component_name)
 
         new_source =
           Rewrite.Source.update(
@@ -135,8 +139,19 @@ defmodule Fireside.Util.Install do
     end
   end
 
+  defp replace_app_name(ast, component_name) do
+    otp_app_name = Igniter.Project.Application.app_name()
+
+    ast
+    |> Macro.prewalk(fn
+      ^component_name -> otp_app_name
+      node -> node
+    end)
+  end
+
   def import_to_project(
         igniter,
+        component_name,
         file_path,
         kind,
         fireside_module_prefix,
@@ -148,6 +163,7 @@ defmodule Fireside.Util.Install do
       |> File.read!()
       |> Sourceror.parse_string!()
       |> replace_module_prefix_from_to(fireside_module_prefix, project_prefix)
+      |> replace_app_name(component_name)
 
     module_name = get_module_name(ast)
 

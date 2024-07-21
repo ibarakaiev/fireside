@@ -83,6 +83,7 @@ defmodule Fireside.Util.Update do
 
         igniter
         |> install_code(
+          component_name,
           expanded_fireside_includes,
           fireside_module_prefix,
           project_prefix,
@@ -94,6 +95,7 @@ defmodule Fireside.Util.Update do
 
   defp install_code(
          igniter,
+         component_name,
          expanded_fireside_includes,
          fireside_module_prefix,
          project_prefix,
@@ -107,6 +109,7 @@ defmodule Fireside.Util.Update do
           igniter ->
             Fireside.Util.Install.import_to_project(
               igniter,
+              component_name,
               path,
               kind,
               fireside_module_prefix,
