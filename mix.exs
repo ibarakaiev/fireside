@@ -42,7 +42,7 @@ defmodule Fireside.MixProject do
     [
       name: :fireside,
       licenses: ["MIT"],
-      files: ~w(lib .formatter.exs mix.exs README* LICENSE*),
+      files: ~w(lib .formatter.exs mix.exs README* LICENSE* CHANGELOG*),
       links: %{
         GitHub: @source_url
       }

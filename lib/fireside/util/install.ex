@@ -44,7 +44,7 @@ defmodule Fireside.Util.Install do
       expanded_fireside_includes,
       fireside_module_prefix,
       project_prefix,
-      expanded_fireside_includes[:overwritable]
+      expanded_fireside_includes[:overwritable] || []
     )
     |> fireside_module.setup()
     |> replace_component_name(component_name, fireside_module_prefix, project_prefix)

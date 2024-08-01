@@ -87,7 +87,7 @@ defmodule Fireside.Util.Update do
           expanded_fireside_includes,
           fireside_module_prefix,
           project_prefix,
-          Map.get(expanded_fireside_includes, :overwritable, [])
+          expanded_fireside_includes[:overwritable] || []
         )
         |> Fireside.add_or_replace_fireside_lock(component_name, component_path)
     end

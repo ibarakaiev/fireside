@@ -1,6 +1,6 @@
 defmodule Mix.Tasks.Fireside.Install do
   @moduledoc """
-  Install a Fireside component.
+  Installs a Fireside component.
 
   ## Args
 
