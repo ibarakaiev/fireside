@@ -5,7 +5,17 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
-## [v0.1.2](https://github.com/ash-project/igniter/compare/v0.0.1...v0.0.2) (2024-07-21)
+## [v0.0.3](https://github.com/ash-project/igniter/compare/v0.0.1...v0.0.2) (2024-08-01)
+
+### Improvements
+
+- Add Changelog to docs
+
+### Bug fixes
+
+- support no `overwritable` in `fireside.install`.
+
+## [v0.0.2](https://github.com/ash-project/igniter/compare/v0.0.1...v0.0.2) (2024-07-21)
 
 ### Improvements
 

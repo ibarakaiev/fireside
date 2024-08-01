@@ -33,7 +33,8 @@ defmodule Fireside.MixProject do
     [
       main: "readme",
       extras: [
-        {"README.md", title: "Home"}
+        {"README.md", title: "Home"},
+        {"CHANGELOG.md", title: "Changelog"}
       ]
     ]
   end
