@@ -2,7 +2,7 @@ defmodule Fireside.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/ibarakaiev/fireside"
-  @version "0.0.2"
+  @version "0.0.3"
 
   @description """
   Fireside is a Elixir library to embed and maintain self-contained Elixir apps
