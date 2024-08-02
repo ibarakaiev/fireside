@@ -53,7 +53,8 @@ defmodule Fireside.MixProject do
   defp deps do
     [
       {:igniter, "~> 0.3.8"},
-      {:ex_doc, "~> 0.32", only: [:dev, :test], runtime: false}
+      {:ex_doc, "~> 0.32", only: [:dev, :test], runtime: false},
+      {:styler, "~> 1.0.0-rc.1", only: [:dev, :test], runtime: false}
     ]
   end
 end
