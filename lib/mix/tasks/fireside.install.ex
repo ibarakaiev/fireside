@@ -36,7 +36,7 @@ defmodule Mix.Tasks.Fireside.Install do
     end
 
     if Fireside.component_installed?(component_name) do
-      raise "#{component_name} is already installed. Use `fireside.update #{component_name}` to update it instead."
+      raise "#{component_name} is already installed. Use `mix fireside.update #{component_name}#{if(length(argv) > 0, do: " " <> Enum.join(argv, " "), else: "")}` to update it instead."
     end
 
     Mix.shell().info("Installing #{component_name}...")

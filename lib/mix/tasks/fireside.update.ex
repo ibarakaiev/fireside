@@ -23,7 +23,7 @@ defmodule Mix.Tasks.Fireside.Update do
     {component_requirements, argv} = Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
 
     unless length(component_requirements) == 1 do
-      raise "Only one component can be provided."
+      raise "Exactly one component must be provided."
     end
 
     [component_requirement] = component_requirements
@@ -32,7 +32,7 @@ defmodule Mix.Tasks.Fireside.Update do
       Fireside.Helpers.determine_component_type_and_version(component_requirement)
 
     unless Fireside.component_installed?(component_name) do
-      raise "#{component_name} is not installed. You can install it with `fireside.install #{component_name}@path:/path/to/#{component_name}`."
+      raise "#{component_name} is not installed. You can install it with `mix fireside.install #{component_name}@path:/path/to/#{component_name}#{if(length(argv) > 0, do: " " <> Enum.join(argv, " "), else: "")}`."
     end
 
     Application.ensure_all_started([:rewrite])

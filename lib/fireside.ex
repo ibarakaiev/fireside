@@ -7,13 +7,25 @@ defmodule Fireside do
 
   require Logger
 
-  def install(component_name, source, opts \\ []) do
+  def install(component_name, source, opts \\ [])
+
+  def install(component_name, source, opts) when is_binary(component_name) do
+    install(String.to_atom(component_name), source, opts)
+  end
+
+  def install(component_name, source, opts) when is_atom(component_name) do
     Fireside.Helpers.ensure_clean_git!()
 
     do_install_or_update(Igniter.new(), component_name, source, opts)
   end
 
-  def update(component_name, source \\ nil, opts \\ []) do
+  def update(component_name, source \\ nil, opts \\ [])
+
+  def update(component_name, source, opts) when is_binary(component_name) do
+    update(String.to_atom(component_name), source, opts)
+  end
+
+  def update(component_name, source, opts) do
     local_component_config = get_local_component_config(component_name)
 
     ensure_integrity!(local_component_config)
@@ -41,6 +53,41 @@ defmodule Fireside do
     end
   end
 
+  def unlock(component_name, opts \\ [])
+
+  def unlock(component_name, opts) when is_binary(component_name) do
+    unlock(String.to_atom(component_name), opts)
+  end
+
+  def unlock(component_name, opts) when is_atom(component_name) do
+    local_component_config = get_local_component_config(component_name)
+
+    igniter =
+      for {file_path, _hash} <- local_component_config[:files], reduce: Igniter.new() do
+        igniter ->
+          Igniter.update_elixir_file(igniter, file_path, fn zipper ->
+            zipper_without_fireside_comments = zipper |> Zipper.node() |> Fireside.Helpers.remove_fireside_comments()
+            {:ok, Zipper.replace(zipper, zipper_without_fireside_comments)}
+          end)
+      end
+
+    igniter
+    |> Config.configure(
+      "fireside.exs",
+      Igniter.Project.Application.app_name(),
+      [Fireside],
+      [],
+      updater: fn zipper ->
+        Igniter.Code.Keyword.remove_keyword_key(zipper, component_name)
+      end
+    )
+    |> run_igniter(opts)
+  end
+
+  defp run_igniter(igniter, opts) do
+    Igniter.do_or_dry_run(igniter, yes: Keyword.get(opts, :yes?, false), title: Keyword.get(opts, :title, "Fireside"))
+  end
+
   defp do_install_or_update(igniter, component_name, source, opts)
 
   defp do_install_or_update(igniter, component_name, [path: component_path], opts) do
@@ -50,11 +97,10 @@ defmodule Fireside do
   defp import_component(igniter, component_name, component_path, opts) do
     current_version = Keyword.get(opts, :current_version, nil)
     unlocked? = Keyword.get(opts, :unlocked?, false)
-    yes? = Keyword.get(opts, :yes?, false)
 
     ensure_path_is_a_fireside_component!(component_path)
 
-    install_required_dependencies(component_path, yes?: yes?)
+    install_required_dependencies(component_path, yes?: Keyword.get(opts, :yes?, false))
 
     fireside_module = get_fireside_component_module(component_name, component_path)
 
@@ -67,7 +113,7 @@ defmodule Fireside do
     igniter =
       igniter
       |> Igniter.update_assign(:fireside_managed_files, [], & &1)
-      |> Igniter.assign(imported_files: [], deletions: [], hashes: %{})
+      |> Igniter.assign(imported_files: [], deletions: [], hashes: [])
       |> install_files(fireside_module, component_path)
       |> run_upgrades(fireside_module, current_version)
       |> replace_component_name(fireside_module)
@@ -91,7 +137,7 @@ defmodule Fireside do
         "\"#{component_name}\" (version: #{fireside_module.config()[:version]}) has been successfully installed."
       )
 
-    if Igniter.do_or_dry_run(igniter, yes: yes?, title: "Fireside") in [:changes_made, :no_changes] do
+    if run_igniter(igniter, opts) in [:changes_made, :no_changes] do
       cleanup_no_longer_used_files(igniter)
     end
   end
@@ -224,8 +270,8 @@ defmodule Fireside do
           Igniter.update_assign(
             %{igniter | rewrite: Rewrite.update!(igniter.rewrite, new_source)},
             :hashes,
-            %{path => hash},
-            fn hashes -> Map.put(hashes, path, hash) end
+            [{path, hash}],
+            fn hashes -> hashes ++ [{path, hash}] end
           )
       end
 
@@ -258,7 +304,11 @@ defmodule Fireside do
     )
   end
 
-  def component_installed?(component_name) do
+  def component_installed?(component_name) when is_binary(component_name) do
+    component_installed?(String.to_atom(component_name))
+  end
+
+  def component_installed?(component_name) when is_atom(component_name) do
     Config.configures_key?(
       Igniter.new(),
       "fireside.exs",
@@ -476,12 +526,6 @@ defmodule Fireside do
     {Sourceror.prepend_comments(
        ast,
        [
-         %{
-           line: 1,
-           previous_eol_count: 1,
-           next_eol_count: 1,
-           text: "#! fireside: #{component_name}:#{hash}"
-         },
          %{
            line: 1,
            previous_eol_count: 1,
