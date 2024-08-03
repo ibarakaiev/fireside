@@ -1,4 +1,5 @@
 defmodule Mix.Tasks.Fireside.Update do
+  @shortdoc "Updates a Fireside component."
   @moduledoc """
   Updates a Fireside component.
 
@@ -8,25 +9,34 @@ defmodule Mix.Tasks.Fireside.Update do
 
   ## Supported formats
 
-  * `component` - The component to be updated
+  * `component` - The component's source will be fetched from the local component config (in `config/fireside.exs`).
+  * `component@path:/path/to/component` - The component will be updated from the specified path.
+
+  ## Options
+
+  * --yes - auto-accept all prompts
   """
   use Mix.Task
 
   @impl true
-  @shortdoc "Update a Fireside component."
   def run(argv) do
-    if length(argv) != 1 do
-      raise ArgumentError, "must provide exactly one component to update"
+    {component_requirements, argv} = Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
+
+    unless length(component_requirements) == 1 do
+      raise "Only one component can be provided."
     end
 
-    [component] = argv
+    [component_requirement] = component_requirements
 
-    if String.contains?(component, "@") do
-      raise ArgumentError, "you may only provide the component name"
+    {component_name, component_source} =
+      Fireside.Helpers.determine_component_type_and_version(component_requirement)
+
+    unless Fireside.component_installed?(component_name) do
+      raise "#{component_name} is not installed. You can install it with `fireside.install #{component_name}@path:/path/to/#{component_name}`."
     end
 
     Application.ensure_all_started([:rewrite])
 
-    Fireside.Util.Update.update(String.to_atom(component))
+    Fireside.update(component_name, component_source, yes?: "--yes" in argv)
   end
 end
