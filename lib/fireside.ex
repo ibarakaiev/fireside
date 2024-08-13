@@ -72,16 +72,42 @@ defmodule Fireside do
       end
 
     igniter
-    |> Config.configure(
-      "fireside.exs",
-      Igniter.Project.Application.app_name(),
-      [Fireside],
-      [],
-      updater: fn zipper ->
-        Igniter.Code.Keyword.remove_keyword_key(zipper, component_name)
-      end
-    )
+    |> remove_local_component_config(component_name)
     |> run_igniter(opts)
+  end
+
+  def uninstall(component_name, opts \\ [])
+
+  def uninstall(component_name, opts) when is_binary(component_name) do
+    uninstall(String.to_atom(component_name), opts)
+  end
+
+  def uninstall(component_name, opts) when is_atom(component_name) do
+    local_component_config = get_local_component_config(component_name)
+
+    igniter =
+      Igniter.new()
+      |> track_managed_files(local_component_config)
+      |> Igniter.assign(:imported_files, [])
+      |> Igniter.add_warning(
+        "Finally, any code modification that were performed in `setup/1` or `upgrade/3` by the component will not be removed. Please consult the component's original Fireside config (fireside.exs) to see if anything was added modified manually, such as config.exs."
+      )
+      |> Igniter.add_warning(
+        "Imported files that were marked as :optional in Fireside's component configuration will also not be deleted, as they could have existed before component installation (for example, `test/supports/data_case.ex` or `lib/my_app_web/endpoint.ex`)"
+      )
+      |> Igniter.add_warning("""
+      NOTE: the dependencies installed alongside the component will NOT be deleted as Fireside has no way of knowing if they are used elsewhere in the codebase.
+
+      If you want to manually delete them, please check the list of non-optional dependencies in the source code of the component you're uninstalling.
+
+      Keep in mind that those dependencies may have had associated Igniter installers that added some code or configuration to your codebase—you may want to delete that too.
+      """)
+      |> add_deletions()
+      |> remove_local_component_config(component_name)
+
+    if run_igniter(igniter, opts) == :changes_made do
+      cleanup_no_longer_used_files(igniter)
+    end
   end
 
   defp run_igniter(igniter, opts) do
@@ -246,6 +272,19 @@ defmodule Fireside do
     end
   end
 
+  defp remove_local_component_config(igniter, component_name) do
+    Config.configure(
+      igniter,
+      "fireside.exs",
+      Igniter.Project.Application.app_name(),
+      [Fireside],
+      [],
+      updater: fn zipper ->
+        Igniter.Code.Keyword.remove_keyword_key(zipper, component_name)
+      end
+    )
+  end
+
   def add_or_replace_fireside_lock(igniter, fireside_module, opts) do
     igniter =
       for source <- Rewrite.sources(igniter.rewrite),
@@ -278,13 +317,13 @@ defmodule Fireside do
     app_name = Igniter.Project.Application.app_name()
 
     igniter
-    |> Config.configure_new(
+    |> Config.configure(
       "fireside.exs",
       app_name,
       [Fireside, fireside_module.config()[:name], :source],
       Keyword.fetch!(opts, :source)
     )
-    |> Config.configure_new(
+    |> Config.configure(
       "fireside.exs",
       app_name,
       [Fireside, fireside_module.config()[:name], :origin],
@@ -300,7 +339,7 @@ defmodule Fireside do
       "fireside.exs",
       app_name,
       [Fireside, fireside_module.config()[:name], :files],
-      igniter.assigns.hashes
+      Macro.escape(igniter.assigns.hashes)
     )
   end
 
