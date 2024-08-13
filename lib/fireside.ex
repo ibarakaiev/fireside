@@ -218,7 +218,7 @@ defmodule Fireside do
 
     igniter =
       if Keyword.fetch!(opts, :skip_if_exists?) do
-        Igniter.include_or_create_elixir_file(
+        Igniter.include_or_create_file(
           igniter,
           proper_location,
           Sourceror.to_string(ast)
@@ -426,7 +426,7 @@ defmodule Fireside do
     for {file_path, _hash} <- local_component_config[:files], reduce: igniter do
       igniter ->
         igniter
-        |> Igniter.include_existing_elixir_file(file_path)
+        |> Igniter.include_existing_file(file_path)
         |> Igniter.update_assign(
           :fireside_managed_files,
           [file_path],
