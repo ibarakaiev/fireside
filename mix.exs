@@ -31,6 +31,7 @@ defmodule Fireside.MixProject do
   defp docs do
     [
       main: "readme",
+      logo: "logos/logo-256.png",
       extras: [
         {"README.md", title: "Overview"},
         "documentation/writing-components.md",

@@ -1,4 +1,5 @@
-<img src="https://github.com/ibarakaiev/fireside/blob/main/logos/logo-256.png" alt="Logo" width="256">
+<img src="https://github.com/ibarakaiev/fireside/blob/main/logos/logo-256.png?raw=true#gh-light-mode-only" alt="Logo Light" width="256">
+<img src="https://github.com/ibarakaiev/fireside/blob/main/logos/logo-256.png?raw=true#gh-dark-mode-only" alt="Logo Dark" width="256">
 
 [![Hex version badge](https://img.shields.io/hexpm/v/fireside.svg)](https://hex.pm/packages/fireside)
 [![Hexdocs badge](https://img.shields.io/badge/docs-hexdocs-purple)](https://hexdocs.pm/fireside)
