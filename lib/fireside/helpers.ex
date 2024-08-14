@@ -175,15 +175,15 @@ defmodule Fireside.Helpers do
 
   def supported_formats(component_name \\ "component") do
     """
-    * #{component_name}@path:/path/to/#{component_name}.
-    * #{component_name}@git:{git_uri}
-    * #{component_name}@git:{git_uri}@ref:{ref}
-    * #{component_name}@git:{git_uri}@branch:{ref}
-    * #{component_name}@git:{git_uri}@tag:{ref}
-    * #{component_name}@github:{org}/{repo_name}
-    * #{component_name}@github:{org}/{repo_name}@ref:{ref}
-    * #{component_name}@github:{org}/{repo_name}@branch:{branch}
-    * #{component_name}@github:{org}/{repo_name}@tag:{tag}
+    * `#{component_name}@path:/path/to/#{component_name}`
+    * `#{component_name}@git:{git_uri}`
+    * `#{component_name}@git:{git_uri}@ref:{ref}`
+    * `#{component_name}@git:{git_uri}@branch:{ref}`
+    * `#{component_name}@git:{git_uri}@tag:{ref}`
+    * `#{component_name}@github:{org}/{repo_name}`
+    * `#{component_name}@github:{org}/{repo_name}@ref:{ref}`
+    * `#{component_name}@github:{org}/{repo_name}@branch:{branch}`
+    * `#{component_name}@github:{org}/{repo_name}@tag:{tag}`
     """
   end
 end

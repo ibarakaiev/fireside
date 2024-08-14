@@ -1,11 +1,11 @@
 defmodule Mix.Tasks.Fireside.Unlock do
   @shortdoc "Unlocks a Fireside component."
   @moduledoc """
-  Unlocks a Fireside component.
+  Unlocks a Fireside component. This task runs `Fireside.unlock/2`.
 
-  ## Args
+  ## Usage
 
-  mix fireside.unlock `component`
+  `mix fireside.unlock component`
 
   ## Supported formats
 
@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Fireside.Unlock do
 
   ## Options
 
-  * --yes - auto-accept all prompts
+  * `--yes` - auto-accept all prompts
   """
   use Mix.Task
 

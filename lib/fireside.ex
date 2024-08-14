@@ -1,5 +1,7 @@
 defmodule Fireside do
-  @moduledoc false
+  @moduledoc """
+  This is the documentation for the Fireside project.
+  """
 
   alias Igniter.Code.Function
   alias Igniter.Project.Config
@@ -7,6 +9,58 @@ defmodule Fireside do
 
   require Logger
 
+  @doc """
+  Checks if the provided component is installed in the current project.
+
+  ## Examples
+
+      iex> Fireside.component_installed?(:example_component)
+      false
+  """
+  def component_installed?(component_name)
+
+  def component_installed?(component_name) when is_binary(component_name) do
+    component_installed?(String.to_atom(component_name))
+  end
+
+  def component_installed?(component_name) when is_atom(component_name) do
+    Config.configures_key?(
+      Igniter.new(),
+      "fireside.exs",
+      Igniter.Project.Application.app_name(),
+      [Fireside, component_name]
+    )
+  end
+
+  @doc """
+  Installs a Fireside component into the project.
+
+  The component can be installed from various sources, including local paths, Git repositories,
+  and GitHub repositories.
+
+  ## Parameters
+
+    - `component_name`: The name of the component to install. It can be an atom or a string.
+    - `source`: The source from which to install the component. The supported formats are:
+      - `[path: component_path]`: Install from a local path.
+      - `[{:git, git_url} | git_opts]`: Install from a Git repository. `git_opts` can include `:ref`, `:branch`, or `:tag`.
+      - `[{:github, github_repo} | git_opts]`: Install from a GitHub repository. `git_opts` can include `:ref`, `:branch`, or `:tag`.
+    - `opts`: A keyword list of options. Supported options include:
+      - `:unlocked?` - When true, the component is installed without being tracked by Fireside.
+      - `:yes?` - When true, auto-accepts all prompts during installation.
+
+  ## Examples
+
+      iex> Fireside.install(:my_component, [path: "/path/to/component"], unlocked?: true)
+      :ok
+
+      iex> Fireside.install(:my_component, [git: "https://github.com/user/repo.git"] ++ [tag: "v1.0.0"])
+      :ok
+
+      iex> Fireside.install(:my_component, [github: "user/repo"] ++ [branch: "main"])
+      :ok
+
+  """
   def install(component_name, source, opts \\ [])
 
   def install(component_name, source, opts) when is_binary(component_name) do
@@ -19,6 +73,32 @@ defmodule Fireside do
     do_install_or_update(Igniter.new(), component_name, source, opts)
   end
 
+  @doc """
+  Updates a previously installed Fireside component.
+
+  The component can be updated from its original source or a new source. If no source is provided,
+  the component's source is fetched from the local component configuration.
+
+  ## Parameters
+
+    - `component_name`: The name of the component to update. It can be an atom or a string.
+    - `source`: The source from which to update the component. If `nil` (default), the source from the
+      local component configuration is used. Otherwise, the supported formats are:
+      - `[path: component_path]`: Install from a local path.
+      - `[{:git, git_url} | git_opts]`: Install from a Git repository. `git_opts` can include `:ref`, `:branch`, or `:tag`.
+      - `[{:github, github_repo} | git_opts]`: Install from a GitHub repository. `git_opts` can include `:ref`, `:branch`, or `:tag`.
+    - `opts`: A keyword list of options. Supported options include:
+      - `:yes?` - When true, auto-accepts all prompts during the update.
+
+  ## Examples
+
+      iex> Fireside.update(:my_component)
+      :ok
+
+      iex> Fireside.update(:my_component, [git: "https://github.com/user/repo.git"] ++ [branch: "dev"])
+      :ok
+
+  """
   def update(component_name, source \\ nil, opts \\ [])
 
   def update(component_name, source, opts) when is_binary(component_name) do
@@ -48,9 +128,27 @@ defmodule Fireside do
       source ->
         do_install_or_update(igniter, component_name, source, opts)
     end
+
+    :ok
   end
 
-  def unlock(component_name, opts \\ [])
+  @doc """
+  Unlocks a Fireside component, removing it from Fireside's tracking without deleting it.
+
+  This is useful if you want to continue using the component but no longer want it to be managed
+  by Fireside.
+
+  ## Parameters
+
+    - `component_name`: The name of the component to unlock. It can be an atom or a string.
+    - `opts`: A keyword list of options. Supported options include:
+      - `:yes?` - When true, auto-accepts all prompts during the unlock process.
+
+  ## Examples
+
+      iex> Fireside.unlock(:my_component)
+      :ok
+  """
 
   def unlock(component_name, opts) when is_binary(component_name) do
     unlock(String.to_atom(component_name), opts)
@@ -71,8 +169,44 @@ defmodule Fireside do
     igniter
     |> remove_local_component_config(component_name)
     |> run_igniter(opts)
+
+    :ok
   end
 
+  @doc """
+  Uninstalls a Fireside component from the project.
+
+  This function will attempt to remove all files and configurations associated with the component that were
+  managed by Fireside. However, there are certain manual steps you may need to perform after the
+  uninstallation; read more in the "Warning" below.
+
+  ## Parameters
+
+    - `component_name`: The name of the component to uninstall. It can be an atom or a string.
+    - `opts`: A keyword list of options. Supported options include:
+      - `:yes?` - When true, auto-accepts all prompts during the uninstallation.
+
+  > ### Warning {: .warning}
+  >
+  > After uninstalling a component, you may need to manually:
+  > 
+  > - **Remove Optional or Manually Added Files**: If the component installation added files that were not tracked by Fireside
+  >   (e.g., files that were marked as `:optional` or added outside the standard component structure via Igniter),
+  >   these will not be automatically deleted. You will need to identify and remove these files yourself.
+  > 
+  > - **Cleanup Configuration Changes**: If the component installation modified configuration files
+  >   (e.g., `config/config.exs`, `config/dev.exs`), these changes will not be reverted automatically.
+  >   Review these files and manually remove any settings or configurations related to the uninstalled component.
+  >  
+  > - **Remove Unused Dependencies**: Dependencies installed alongside the component will not be automatically
+  >   removed, as Fireside cannot determine if they are used elsewhere in your project. You may need to manually
+  >   remove these dependencies from your `mix.exs` file and run `mix deps.clean` to fully remove them from your project.
+
+  ## Examples
+
+      iex> Fireside.uninstall(:my_component)
+      :ok
+  """
   def uninstall(component_name, opts \\ [])
 
   def uninstall(component_name, opts) when is_binary(component_name) do
@@ -105,6 +239,8 @@ defmodule Fireside do
     if run_igniter(igniter, opts) == :changes_made do
       cleanup_no_longer_used_files(igniter)
     end
+
+    :ok
   end
 
   defp run_igniter(igniter, opts) do
@@ -322,7 +458,7 @@ defmodule Fireside do
     )
   end
 
-  def add_or_replace_fireside_lock(igniter, fireside_module, origin) do
+  defp add_or_replace_fireside_lock(igniter, fireside_module, origin) do
     igniter =
       for source <- Rewrite.sources(igniter.rewrite),
           Rewrite.Source.get(source, :path) in igniter.assigns.imported_files,
@@ -374,20 +510,7 @@ defmodule Fireside do
     )
   end
 
-  def component_installed?(component_name) when is_binary(component_name) do
-    component_installed?(String.to_atom(component_name))
-  end
-
-  def component_installed?(component_name) when is_atom(component_name) do
-    Config.configures_key?(
-      Igniter.new(),
-      "fireside.exs",
-      Igniter.Project.Application.app_name(),
-      [Fireside, component_name]
-    )
-  end
-
-  def ensure_path_is_a_fireside_component!(path) do
+  defp ensure_path_is_a_fireside_component!(path) do
     unless File.dir?(path) do
       raise "directory `#{path}` doesn't exist"
     end
@@ -399,7 +522,7 @@ defmodule Fireside do
     end
   end
 
-  def get_fireside_component_module(component_name, component_path) do
+  defp get_fireside_component_module(component_name, component_path) do
     fireside_module_path = Path.join(component_path, "/fireside.exs")
 
     fireside_module = Fireside.Helpers.load_module(fireside_module_path)
@@ -411,7 +534,7 @@ defmodule Fireside do
     fireside_module
   end
 
-  def get_local_component_config(component_name) do
+  defp get_local_component_config(component_name) do
     zipper =
       "config/fireside.exs"
       |> File.read!()
@@ -453,7 +576,7 @@ defmodule Fireside do
     config
   end
 
-  def track_managed_files(igniter, local_component_config) do
+  defp track_managed_files(igniter, local_component_config) do
     for {file_path, _hash} <- local_component_config[:files], reduce: igniter do
       igniter ->
         igniter
@@ -466,7 +589,7 @@ defmodule Fireside do
     end
   end
 
-  def replace_component_name(igniter, fireside_module) do
+  defp replace_component_name(igniter, fireside_module) do
     fireside_module_prefix = Fireside.Helpers.get_module_prefix(fireside_module)
     project_prefix = Fireside.Helpers.get_module_prefix(Mix.Project.get!())
 
@@ -493,7 +616,7 @@ defmodule Fireside do
     end
   end
 
-  def install_required_dependencies(component_path, opts) do
+  defp install_required_dependencies(component_path, opts) do
     mix_file = Path.join(component_path, "mix.exs")
 
     unless File.exists?(mix_file) do
@@ -542,7 +665,7 @@ defmodule Fireside do
     Mix.Task.run("deps.compile")
   end
 
-  def ensure_integrity!(imported_component_config) do
+  defp ensure_integrity!(imported_component_config) do
     igniter = track_managed_files(Igniter.new(), imported_component_config)
 
     for {file_path, hash} <- imported_component_config[:files] do
@@ -564,7 +687,7 @@ defmodule Fireside do
     :ok
   end
 
-  def run_upgrades(igniter, fireside_module, current_version) do
+  defp run_upgrades(igniter, fireside_module, current_version) do
     target_version = fireside_module.config()[:version]
 
     if target_version > current_version do

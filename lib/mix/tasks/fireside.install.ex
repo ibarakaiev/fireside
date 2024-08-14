@@ -1,11 +1,11 @@
 defmodule Mix.Tasks.Fireside.Install do
   @shortdoc "Installs a Fireside component."
   @moduledoc """
-  Installs a Fireside component.
+  Installs a Fireside component. This task runs `Fireside.install/3`.
 
-  ## Args
+  ## Usage
 
-  mix fireside.install `component`
+  `mix fireside.install component@...`
 
   ## Supported formats
 
@@ -13,8 +13,8 @@ defmodule Mix.Tasks.Fireside.Install do
 
   ## Options
 
-  * --unlocked - the component will be installed without being tracked by Fireside.
-  * --yes - auto-accept all prompts
+  * `--unlocked` - the component will be installed without being tracked by Fireside.
+  * `--yes` - auto-accept all prompts
   """
   use Mix.Task
 

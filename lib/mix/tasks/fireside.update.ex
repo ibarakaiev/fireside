@@ -1,11 +1,11 @@
 defmodule Mix.Tasks.Fireside.Update do
   @shortdoc "Updates a Fireside component."
   @moduledoc """
-  Updates a Fireside component.
+  Updates a Fireside component. This task runs `Fireside.update/3`.
 
-  ## Args
+  ## Usage
 
-  mix fireside.update `component`
+  `mix fireside.update component@...`
 
   ## Supported formats
 
@@ -14,7 +14,7 @@ defmodule Mix.Tasks.Fireside.Update do
 
   ## Options
 
-  * --yes - auto-accept all prompts
+  * `--yes` - auto-accept all prompts
   """
   use Mix.Task
 

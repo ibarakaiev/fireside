@@ -1,11 +1,12 @@
 defmodule Mix.Tasks.Fireside.Uninstall do
   @shortdoc "Uninstalls a Fireside component."
   @moduledoc """
-  Uninstalls a Fireside component.
+  Uninstalls a Fireside component. This task runs `Fireside.uninstall/2`.
 
-  ## Args
 
-  mix fireside.uninstall `component`
+  ## Usage
+
+  `mix fireside.uninstall component`
 
   ## Supported formats
 
@@ -13,7 +14,7 @@ defmodule Mix.Tasks.Fireside.Uninstall do
 
   ## Options
 
-  * --yes - auto-accept all prompts
+  * `--yes` - auto-accept all prompts
   """
   use Mix.Task
 
