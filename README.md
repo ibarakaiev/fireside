@@ -1,3 +1,8 @@
+<img src="https://github.com/ibarakaiev/fireside/blob/main/logos/logo-256.png" alt="Logo" width="256">
+
+[![Hex version badge](https://img.shields.io/hexpm/v/fireside.svg)](https://hex.pm/packages/fireside)
+[![Hexdocs badge](https://img.shields.io/badge/docs-hexdocs-purple)](https://hexdocs.pm/fireside)
+
 # Fireside
 
 Fireside is a small Elixir library that allows importing code components
