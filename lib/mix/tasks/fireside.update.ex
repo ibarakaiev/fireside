@@ -35,7 +35,9 @@ defmodule Mix.Tasks.Fireside.Update do
       raise """
       #{component_name} is not installed. You can install it with `mix fireside.install #{component_name}@... #{if(length(argv) > 0, do: " " <> Enum.join(argv, " "), else: "")}`.
 
-      #{Fireside.Helpers.supported_formats(component_name)}.
+      Supported formats:
+
+      #{Fireside.Helpers.supported_formats(component_name)}
       """
     end
 

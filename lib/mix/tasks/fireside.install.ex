@@ -33,7 +33,7 @@ defmodule Mix.Tasks.Fireside.Install do
 
     if is_nil(component_source) do
       raise """
-      Make sure to the provide the source for the component. Supported formats:
+      Make sure to provide the source for the component. Supported formats:
 
       #{Fireside.Helpers.supported_formats(component_name)}
       """
