@@ -5,7 +5,15 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
-## v0.1.0 (2024-08-14)
+## [v0.1.1](https://github.com/ash-project/igniter/compare/v0.1.0...v0.1.1) (2024-08-14)
+
+### Improvements
+- add Fireside logo and hex badges
+
+### Fixes
+- typos
+
+## [v0.1.0](https://github.com/ash-project/igniter/compare/v0.0.3...v0.1.0) (2024-08-14)
 
 ### Improvements
 
@@ -16,7 +24,7 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 - add Git and Github support
 - documentation improvements
 
-## [v0.0.3](https://github.com/ash-project/igniter/compare/v0.0.1...v0.0.2) (2024-08-01)
+## [v0.0.3](https://github.com/ash-project/igniter/compare/v0.0.2...v0.0.3) (2024-08-01)
 
 ### Improvements
 
