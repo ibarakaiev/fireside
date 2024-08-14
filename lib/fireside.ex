@@ -160,8 +160,18 @@ defmodule Fireside do
 
     {igniter, current_version} =
       case current_version do
-        nil -> {fireside_module.setup(igniter), 1}
-        _ -> {igniter, current_version}
+        nil ->
+          igniter =
+            try do
+              fireside_module.setup(igniter)
+            rescue
+              _ -> igniter
+            end
+
+          {igniter, 1}
+
+        _ ->
+          {igniter, current_version}
       end
 
     igniter =
