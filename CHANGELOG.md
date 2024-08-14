@@ -7,7 +7,7 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 ## v0.1.0 (2024-08-14)
 
-## Improvements
+### Improvements
 
 - change the format of `fireside.exs` and `config/fireside.exs`
 - add `fireside.unlock` and `fireside.uninstall`
