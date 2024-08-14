@@ -35,8 +35,8 @@ defmodule Fireside do
   @doc """
   Installs a Fireside component into the project.
 
-  The component can be installed from various sources, including local paths, Git repositories,
-  and GitHub repositories.
+  This is done by importing files listed in `config/0` (in `fireside.exs`) of the target component.
+  If the component defines a `setup/1` method, it will also be called.
 
   ## Parameters
 
@@ -76,8 +76,17 @@ defmodule Fireside do
   @doc """
   Updates a previously installed Fireside component.
 
-  The component can be updated from its original source or a new source. If no source is provided,
-  the component's source is fetched from the local component configuration.
+  This is done by reimporting files listed in `config/0` (in `fireside.exs`) of the target component.
+  If the component's version is being changed and a corresponding `upgrade/3` migration is defined,
+  it will also be executed. (Note: multiple `upgrade/3` migrations may be executed if the app's
+  version is changed by more than 1.)
+
+  Before updating, the integrity of the installed component will be checked by comparing the hash
+  of the AST with the hash listed in `config/fireside.exs`. If the installed component has been
+  modified and has diverged from its original source, the operation will be aborted, as it might
+  lead to a regression since any added/removed functionality may be overwritten by remote updates.
+  In this case, it is recommended to run `unlock/2` to instruct Fireside to stop tracking the
+  component's source.
 
   ## Parameters
 
@@ -192,12 +201,10 @@ defmodule Fireside do
   > 
   > - **Remove Optional or Manually Added Files**: If the component installation added files that were not tracked by Fireside
   >   (e.g., files that were marked as `:optional` or added outside the standard component structure via Igniter),
-  >   these will not be automatically deleted. You will need to identify and remove these files yourself.
-  > 
+  >   these will not be automatically deleted. You will need to identify and remove these files yourself, if needed.
   > - **Cleanup Configuration Changes**: If the component installation modified configuration files
   >   (e.g., `config/config.exs`, `config/dev.exs`), these changes will not be reverted automatically.
   >   Review these files and manually remove any settings or configurations related to the uninstalled component.
-  >  
   > - **Remove Unused Dependencies**: Dependencies installed alongside the component will not be automatically
   >   removed, as Fireside cannot determine if they are used elsewhere in your project. You may need to manually
   >   remove these dependencies from your `mix.exs` file and run `mix deps.clean` to fully remove them from your project.
