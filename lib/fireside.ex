@@ -603,7 +603,7 @@ defmodule Fireside do
           source
           |> Rewrite.Source.get(:quoted)
           |> Fireside.Helpers.replace_module_prefix_from_to(fireside_module_prefix, project_prefix)
-          |> Fireside.Helpers.replace_app_name(fireside_module.config()[:name])
+          |> Fireside.Helpers.replace_app_prefix(fireside_module.config()[:name])
 
         new_source =
           Rewrite.Source.update(

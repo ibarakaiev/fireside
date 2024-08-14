@@ -127,12 +127,24 @@ defmodule Fireside.Helpers do
     end)
   end
 
-  def replace_app_name(ast, component_name) do
-    otp_app_name = Igniter.Project.Application.app_name()
+  def replace_app_prefix(ast, component_name) do
+    otp_app_name_str = Atom.to_string(Igniter.Project.Application.app_name())
+    component_name_str = Atom.to_string(component_name)
 
     Macro.prewalk(ast, fn
-      ^component_name -> otp_app_name
-      node -> node
+      atom when is_atom(atom) ->
+        atom_str = Atom.to_string(atom)
+
+        if String.starts_with?(atom_str, component_name_str) do
+          atom_str
+          |> String.replace_prefix(component_name_str, otp_app_name_str)
+          |> String.to_atom()
+        else
+          atom
+        end
+
+      node ->
+        node
     end)
   end
 
