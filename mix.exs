@@ -5,8 +5,7 @@ defmodule Fireside.MixProject do
   @version "0.1.0"
 
   @description """
-  Fireside is a Elixir library to embed and maintain self-contained Elixir apps
-  into your existing Elixir application with smart code generation.
+  Fireside is a small Elixir library that allows importing code components (templates) into an existing Elixir project together with their dependencies. It also allows upgrading these components if they have a newer version available. 
   """
 
   def project do
