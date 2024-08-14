@@ -50,7 +50,7 @@ end
 ## Usage
 
 To see supported Fireside tasks, refer to
-[Mix Tasks](https://hexdocs.pm/fireside/doc/api-reference.html#mix-tasks).
+[Mix Tasks](https://hexdocs.pm/fireside/api-reference.html#mix-tasks).
 
 ## Upgrading code components with Fireside
 
