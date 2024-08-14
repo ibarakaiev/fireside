@@ -10,7 +10,7 @@ defmodule Mix.Tasks.Fireside.Update do
   ## Supported formats
 
   * `component` - The component's source will be fetched from the local component config (in `config/fireside.exs`).
-  * `component@path:/path/to/component` - The component will be updated from the specified path.
+  #{Fireside.Helpers.supported_formats()}
 
   ## Options
 
@@ -29,10 +29,14 @@ defmodule Mix.Tasks.Fireside.Update do
     [component_requirement] = component_requirements
 
     {component_name, component_source} =
-      Fireside.Helpers.determine_component_type_and_version(component_requirement)
+      Fireside.Helpers.determine_component_source(component_requirement)
 
     unless Fireside.component_installed?(component_name) do
-      raise "#{component_name} is not installed. You can install it with `mix fireside.install #{component_name}@path:/path/to/#{component_name}#{if(length(argv) > 0, do: " " <> Enum.join(argv, " "), else: "")}`."
+      raise """
+      #{component_name} is not installed. You can install it with `mix fireside.install #{component_name}@... #{if(length(argv) > 0, do: " " <> Enum.join(argv, " "), else: "")}`.
+
+      #{Fireside.Helpers.supported_formats(component_name)}.
+      """
     end
 
     Application.ensure_all_started([:rewrite])

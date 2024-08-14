@@ -23,27 +23,69 @@ defmodule Fireside.Helpers do
     end
   end
 
-  def determine_component_type_and_version(requirement) do
+  def determine_component_source(requirement) do
     case String.split(requirement, "@", trim: true, parts: 2) do
       [component_name] ->
         {String.to_atom(component_name), nil}
 
       [component, suffix] ->
-        case suffix do
-          "git:" <> _requirement ->
-            raise "@git components are not yet supported"
-
-          "github:" <> _requirement ->
-            raise "@github components are not yet supported"
-
-          "path:" <> requirement ->
+        case parse_suffix(suffix) do
+          {:path, requirement} ->
             {String.to_atom(component), path: requirement}
 
-          _version ->
-            raise "only @path components are currently supported"
+          {:git, git_uri, opts} ->
+            {String.to_atom(component), [git: git_uri] ++ opts}
+
+          {:github, github_repo, opts} ->
+            {String.to_atom(component), [github: github_repo] ++ opts}
+
+          :unsupported ->
+            raise "only @path:, @git:, and @github: components are currently supported. @git and @github additionally support @ref:, @branch:, and @tag: suffixes."
         end
     end
   end
+
+  defp parse_suffix("path:" <> requirement), do: {:path, requirement}
+
+  defp parse_suffix("git:" <> remainder) do
+    case String.split(remainder, "@", trim: true) do
+      [git_uri] ->
+        {:git, git_uri, []}
+
+      [git_uri, "ref:" <> ref] ->
+        {:git, git_uri, [ref: ref]}
+
+      [git_uri, "branch:" <> branch] ->
+        {:git, git_uri, [branch: branch]}
+
+      [git_uri, "tag:" <> tag] ->
+        {:git, git_uri, [tag: tag]}
+
+      _ ->
+        :unsupported
+    end
+  end
+
+  defp parse_suffix("github:" <> remainder) do
+    case String.split(remainder, "@", trim: true) do
+      [github_repo] ->
+        {:github, github_repo, []}
+
+      [github_repo, "ref:" <> ref] ->
+        {:github, github_repo, [ref: ref]}
+
+      [github_repo, "branch:" <> branch] ->
+        {:github, github_repo, [branch: branch]}
+
+      [github_repo, "tag:" <> tag] ->
+        {:github, github_repo, [tag: tag]}
+
+      _ ->
+        :unsupported
+    end
+  end
+
+  defp parse_suffix(_), do: :unsupported
 
   def load_module(path) do
     [{module, _}] = Code.require_file(path)
@@ -129,5 +171,19 @@ defmodule Fireside.Helpers do
     unless match?({"", 0}, System.cmd("git", ["status", "--porcelain"])) do
       raise "Please stage or stash your current Git changes before continuing."
     end
+  end
+
+  def supported_formats(component_name \\ "component") do
+    """
+    * #{component_name}@path:/path/to/#{component_name}.
+    * #{component_name}@git:{git_uri}
+    * #{component_name}@git:{git_uri}@ref:{ref}
+    * #{component_name}@git:{git_uri}@branch:{ref}
+    * #{component_name}@git:{git_uri}@tag:{ref}
+    * #{component_name}@github:{org}/{repo_name}
+    * #{component_name}@github:{org}/{repo_name}@ref:{ref}
+    * #{component_name}@github:{org}/{repo_name}@branch:{branch}
+    * #{component_name}@github:{org}/{repo_name}@tag:{tag}
+    """
   end
 end

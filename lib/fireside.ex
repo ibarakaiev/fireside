@@ -38,15 +38,12 @@ defmodule Fireside do
 
     case source do
       nil ->
-        case local_component_config[:origin] do
-          :local ->
-            do_install_or_update(
-              igniter,
-              component_name,
-              [path: local_component_config[:source]],
-              opts
-            )
-        end
+        do_install_or_update(
+          igniter,
+          component_name,
+          local_component_config[:origin],
+          opts
+        )
 
       source ->
         do_install_or_update(igniter, component_name, source, opts)
@@ -116,11 +113,42 @@ defmodule Fireside do
 
   defp do_install_or_update(igniter, component_name, source, opts)
 
-  defp do_install_or_update(igniter, component_name, [path: component_path], opts) do
-    import_component(igniter, component_name, component_path, opts ++ [origin: :local, source: component_path])
+  defp do_install_or_update(igniter, component_name, [{:github, github_repo} | params], opts) do
+    git_url = "https://github.com/#{github_repo}.git"
+    do_install_or_update(igniter, component_name, [git: git_url] ++ params, opts)
   end
 
-  defp import_component(igniter, component_name, component_path, opts) do
+  defp do_install_or_update(igniter, component_name, [{:git, git_url} | git_opts] = origin, opts) do
+    temp_dir = Path.join(System.tmp_dir!(), "fireside_#{component_name}_#{:os.system_time(:millisecond)}")
+
+    File.mkdir_p!(temp_dir)
+
+    {_, 0} = System.cmd("git", ["clone", git_url, temp_dir])
+
+    cond do
+      ref = git_opts[:ref] ->
+        {_, 0} = System.cmd("git", ["checkout", ref], cd: temp_dir)
+
+      branch = git_opts[:branch] ->
+        {_, 0} = System.cmd("git", ["checkout", branch], cd: temp_dir)
+
+      tag = git_opts[:tag] ->
+        {_, 0} = System.cmd("git", ["checkout", "tags/#{tag}"], cd: temp_dir)
+
+      true ->
+        :ok
+    end
+
+    import_component(igniter, component_name, temp_dir, origin, opts)
+
+    File.rm_rf!(temp_dir)
+  end
+
+  defp do_install_or_update(igniter, component_name, [path: component_path] = origin, opts) do
+    import_component(igniter, component_name, component_path, origin, opts)
+  end
+
+  defp import_component(igniter, component_name, component_path, origin, opts) do
     current_version = Keyword.get(opts, :current_version, nil)
     unlocked? = Keyword.get(opts, :unlocked?, false)
 
@@ -152,8 +180,7 @@ defmodule Fireside do
         add_or_replace_fireside_lock(
           igniter,
           fireside_module,
-          origin: Keyword.fetch!(opts, :origin),
-          source: Keyword.fetch!(opts, :source)
+          origin
         )
       end
 
@@ -285,7 +312,7 @@ defmodule Fireside do
     )
   end
 
-  def add_or_replace_fireside_lock(igniter, fireside_module, opts) do
+  def add_or_replace_fireside_lock(igniter, fireside_module, origin) do
     igniter =
       for source <- Rewrite.sources(igniter.rewrite),
           Rewrite.Source.get(source, :path) in igniter.assigns.imported_files,
@@ -320,14 +347,8 @@ defmodule Fireside do
     |> Config.configure(
       "fireside.exs",
       app_name,
-      [Fireside, fireside_module.config()[:name], :source],
-      Keyword.fetch!(opts, :source)
-    )
-    |> Config.configure(
-      "fireside.exs",
-      app_name,
       [Fireside, fireside_module.config()[:name], :origin],
-      Keyword.fetch!(opts, :origin)
+      origin
     )
     |> Config.configure(
       "fireside.exs",

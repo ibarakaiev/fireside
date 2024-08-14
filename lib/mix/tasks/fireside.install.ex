@@ -9,7 +9,7 @@ defmodule Mix.Tasks.Fireside.Install do
 
   ## Supported formats
 
-  * `component@path:../path/to/component` - The component will be installed from the specified path.
+  #{Fireside.Helpers.supported_formats()}
 
   ## Options
 
@@ -29,10 +29,14 @@ defmodule Mix.Tasks.Fireside.Install do
     [component_requirement] = component_requirements
 
     {component_name, component_source} =
-      Fireside.Helpers.determine_component_type_and_version(component_requirement)
+      Fireside.Helpers.determine_component_source(component_requirement)
 
     if is_nil(component_source) do
-      raise "Make sure to the provide the source for the component, i.e. #{component_name}@path:/path/to/#{component_name}."
+      raise """
+      Make sure to the provide the source for the component. Supported formats:
+
+      #{Fireside.Helpers.supported_formats(component_name)}
+      """
     end
 
     if Fireside.component_installed?(component_name) do
