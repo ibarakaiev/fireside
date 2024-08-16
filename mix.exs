@@ -34,7 +34,7 @@ defmodule Fireside.MixProject do
       logo: "logos/logo-256.png",
       extras: [
         {"README.md", title: "Overview"},
-        "documentation/writing-components.md",
+        "documentation/creating-components.md",
         {"CHANGELOG.md", title: "Changelog"}
       ]
     ]
