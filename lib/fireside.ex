@@ -663,7 +663,6 @@ defmodule Fireside do
         false
     end)
     |> Igniter.Util.Install.install(if(yes?, do: ["--yes"], else: []), Igniter.new(),
-      append?: true,
       error_on_abort?: true,
       title: "Fireside",
       notify_on_present?: false
