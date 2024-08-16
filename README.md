@@ -8,7 +8,7 @@
 
 Fireside is a small Elixir library that allows importing code components
 (templates) into an existing Elixir project together with their dependencies.
-It _also_ allows upgrading these components if they have a newer version
+It also allows _upgrading_ these components if they have a newer version
 available.
 
 ## Installation
