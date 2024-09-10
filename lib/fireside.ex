@@ -24,10 +24,12 @@ defmodule Fireside do
   end
 
   def component_installed?(component_name) when is_atom(component_name) do
+    igniter = Igniter.new()
+
     Config.configures_key?(
-      Igniter.new(),
+      igniter,
       "fireside.exs",
-      Igniter.Project.Application.app_name(),
+      Igniter.Project.Application.app_name(igniter),
       [Fireside, component_name]
     )
   end
@@ -198,7 +200,7 @@ defmodule Fireside do
   > ### Warning {: .warning}
   >
   > After uninstalling a component, you may need to manually:
-  > 
+  >
   > - **Remove Optional or Manually Added Files**: If the component installation added files that were not tracked by Fireside
   >   (e.g., files that were marked as `:optional` or added outside the standard component structure via Igniter),
   >   these will not be automatically deleted. You will need to identify and remove these files yourself, if needed.
@@ -456,7 +458,7 @@ defmodule Fireside do
     Config.configure(
       igniter,
       "fireside.exs",
-      Igniter.Project.Application.app_name(),
+      Igniter.Project.Application.app_name(igniter),
       [Fireside],
       [],
       updater: fn zipper ->
@@ -494,7 +496,7 @@ defmodule Fireside do
           )
       end
 
-    app_name = Igniter.Project.Application.app_name()
+    app_name = Igniter.Project.Application.app_name(igniter)
 
     igniter
     |> Config.configure(
@@ -548,7 +550,7 @@ defmodule Fireside do
       |> Sourceror.parse_string!()
       |> Sourceror.Zipper.zip()
 
-    otp_app = Igniter.Project.Application.app_name()
+    otp_app = Igniter.Project.Application.app_name(Igniter.new())
 
     {:ok, zipper} =
       Function.move_to_function_call_in_current_scope(
@@ -610,7 +612,10 @@ defmodule Fireside do
           source
           |> Rewrite.Source.get(:quoted)
           |> Fireside.Helpers.replace_module_prefix_from_to(fireside_module_prefix, project_prefix)
-          |> Fireside.Helpers.replace_app_prefix(fireside_module.config()[:name])
+          |> Fireside.Helpers.replace_app_prefix(
+            Igniter.Project.Application.app_name(igniter),
+            fireside_module.config()[:name]
+          )
 
         new_source =
           Rewrite.Source.update(
@@ -668,7 +673,7 @@ defmodule Fireside do
       notify_on_present?: false
     )
 
-    Mix.Task.run("deps.compile")
+    Igniter.Util.DepsCompile.run()
   end
 
   defp ensure_integrity!(imported_component_config) do

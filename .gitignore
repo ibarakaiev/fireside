@@ -26,3 +26,5 @@ fireside-*.tar
 /tmp/
 
 livebooks
+
+.elixir_ls

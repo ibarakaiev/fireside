@@ -33,7 +33,7 @@ with the Mix project name of your app (e.g. `:my_app`).
 
 > ### Note {: .info}
 > Replacing is done by comparing prefixes; that is, `MyComponentWeb` will
-> become `MyAppWeb`. Similarly, `:my_component_web` will become 
+> become `MyAppWeb`. Similarly, `:my_component_web` will become
 > `my_app_web`.
 
 ### Required files
@@ -78,7 +78,7 @@ migrations. You can achieve this with the following `setup/1` function:
 
 ```elixir
 def setup(igniter) do
-  app_name = Igniter.Project.Application.app_name()
+  app_name = Igniter.Project.Application.app_name(igniter)
 
   igniter
   |> Igniter.Project.Config.configure(

@@ -127,8 +127,8 @@ defmodule Fireside.Helpers do
     end)
   end
 
-  def replace_app_prefix(ast, component_name) do
-    otp_app_name_str = Atom.to_string(Igniter.Project.Application.app_name())
+  def replace_app_prefix(ast, app_name, component_name) do
+    otp_app_name_str = Atom.to_string(app_name)
     component_name_str = Atom.to_string(component_name)
 
     Macro.prewalk(ast, fn
