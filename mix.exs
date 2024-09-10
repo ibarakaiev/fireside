@@ -2,10 +2,10 @@ defmodule Fireside.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/ibarakaiev/fireside"
-  @version "0.1.3"
+  @version "0.1.4"
 
   @description """
-  Fireside is a small Elixir library that allows importing code components (templates) into an existing Elixir project together with their dependencies. It also allows upgrading these components if they have a newer version available. 
+  Fireside is a small Elixir library that allows importing code components (templates) into an existing Elixir project together with their dependencies. It also allows upgrading these components if they have a newer version available.
   """
 
   def project do
