@@ -688,8 +688,6 @@ defmodule Fireside do
       title: "Fireside",
       notify_on_present?: false
     )
-
-    Igniter.Util.DepsCompile.run()
   end
 
   defp ensure_integrity!(imported_component_config) do
