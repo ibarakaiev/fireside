@@ -21,13 +21,13 @@ defmodule Mix.Tasks.Fireside.Unlock do
   def run(argv) do
     {component_name, argv} = Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
 
-    unless length(component_name) == 1 do
+    if length(component_name) != 1 do
       raise "Exactly one component must be provided."
     end
 
     [component_name] = component_name
 
-    unless Fireside.component_installed?(component_name) do
+    if !Fireside.component_installed?(component_name) do
       raise "#{component_name} is not installed. You can install it with `mix fireside.install #{component_name}@path:/path/to/#{component_name}#{if(length(argv) > 0, do: " " <> Enum.join(argv, " "), else: "")} --unlock`."
     end
 

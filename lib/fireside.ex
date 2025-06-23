@@ -172,7 +172,9 @@ defmodule Fireside do
       for {file_path, _hash} <- local_component_config[:files], reduce: Igniter.new() do
         igniter ->
           Igniter.update_elixir_file(igniter, file_path, fn zipper ->
-            zipper_without_fireside_comments = zipper |> Zipper.node() |> Fireside.Helpers.remove_fireside_comments()
+            zipper_without_fireside_comments =
+              zipper |> Zipper.node() |> Fireside.Helpers.remove_fireside_comments()
+
             {:ok, Zipper.replace(zipper, zipper_without_fireside_comments)}
           end)
       end
@@ -253,7 +255,10 @@ defmodule Fireside do
   end
 
   defp run_igniter(igniter, opts) do
-    Igniter.do_or_dry_run(igniter, yes: Keyword.get(opts, :yes?, false), title: Keyword.get(opts, :title, "Fireside"))
+    Igniter.do_or_dry_run(igniter,
+      yes: Keyword.get(opts, :yes?, false),
+      title: Keyword.get(opts, :title, "Fireside")
+    )
   end
 
   defp do_install_or_update(igniter, component_name, source, opts)
@@ -264,7 +269,8 @@ defmodule Fireside do
   end
 
   defp do_install_or_update(igniter, component_name, [{:git, git_url} | git_opts] = origin, opts) do
-    temp_dir = Path.join(System.tmp_dir!(), "fireside_#{component_name}_#{:os.system_time(:millisecond)}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "fireside_#{component_name}_#{:os.system_time(:millisecond)}")
 
     File.mkdir_p!(temp_dir)
 
@@ -352,7 +358,10 @@ defmodule Fireside do
 
   defp install_files(igniter, fireside_module, component_path) do
     fireside_component_files =
-      Fireside.Helpers.expand_fireside_component_globs(fireside_module.config()[:files], component_path)
+      Fireside.Helpers.expand_fireside_component_globs(
+        fireside_module.config()[:files],
+        component_path
+      )
 
     for kind <- [:required, :optional], reduce: igniter do
       igniter ->
@@ -365,7 +374,8 @@ defmodule Fireside do
             component_path,
             relative_path,
             skip_if_exists?: kind == :optional,
-            untracked?: relative_path in fireside_component_files[:overwritable] or kind == :optional
+            untracked?:
+              relative_path in fireside_component_files[:overwritable] or kind == :optional
           )
         end)
     end
@@ -408,7 +418,8 @@ defmodule Fireside do
       else
         fireside_managed_files = igniter.assigns.fireside_managed_files
 
-        if Igniter.exists?(igniter, proper_location) and proper_location not in fireside_managed_files do
+        if Igniter.exists?(igniter, proper_location) and
+             proper_location not in fireside_managed_files do
           raise "Conflicting file #{proper_location} already exists, aborting."
         end
 
@@ -444,7 +455,9 @@ defmodule Fireside do
       igniter ->
         igniter
         |> Igniter.add_warning("#{file_path} will be deleted.")
-        |> Igniter.update_assign(:deletions, [file_path], fn deletions -> deletions ++ [file_path] end)
+        |> Igniter.update_assign(:deletions, [file_path], fn deletions ->
+          deletions ++ [file_path]
+        end)
     end
   end
 
@@ -611,7 +624,10 @@ defmodule Fireside do
         new_quoted =
           source
           |> Rewrite.Source.get(:quoted)
-          |> Fireside.Helpers.replace_module_prefix_from_to(fireside_module_prefix, project_prefix)
+          |> Fireside.Helpers.replace_module_prefix_from_to(
+            fireside_module_prefix,
+            project_prefix
+          )
           |> Fireside.Helpers.replace_app_prefix(
             Igniter.Project.Application.app_name(igniter),
             fireside_module.config()[:name]

@@ -180,7 +180,7 @@ defmodule Fireside.Helpers do
   end
 
   def ensure_clean_git! do
-    unless match?({"", 0}, System.cmd("git", ["status", "--porcelain"])) do
+    if !match?({"", 0}, System.cmd("git", ["status", "--porcelain"])) do
       raise "Please stage or stash your current Git changes before continuing."
     end
   end

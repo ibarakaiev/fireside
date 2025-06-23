@@ -22,7 +22,7 @@ defmodule Mix.Tasks.Fireside.Install do
   def run(argv) do
     {component_requirements, argv} = Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
 
-    unless length(component_requirements) == 1 do
+    if length(component_requirements) != 1 do
       raise "Only one component can be provided."
     end
 
