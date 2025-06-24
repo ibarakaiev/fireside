@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 See [Conventional Commits](Https://conventionalcommits.org) for commit guidelines.
 
 <!-- changelog -->
+
+## [v0.2.0](https://github.com/ibarakaiev/fireside/compare/v0.1.4...v0.2.0) (2025-06-24)
+
+### Improvements
+- migrate to using .fireside.exs instead of config/fireside.exs. NOTE: this is a breaking
+change that requires manual migration of the component config.
+- add `--force` and `--no-hash` options to `mix fireside.update`.
+- add `--no-hash` option to `mix fireside.install`.
+- upgrade to Igniter ~> 0.6.
+
+
 ## [v0.1.4](https://github.com/ibarakaiev/fireside/compare/v0.1.3...v0.1.4) (2024-09-09)
 
 ### Fixes
