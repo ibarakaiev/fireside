@@ -44,6 +44,7 @@ defmodule Fireside do
     - `opts`: A keyword list of options. Supported options include:
       - `:unlocked?` - When true, the component is installed without being tracked by Fireside.
       - `:yes?` - When true, auto-accepts all prompts during installation.
+      - `:no_hash?` - When true, skips adding hash to files and .fireside.exs.
 
   ## Examples
 
@@ -94,6 +95,8 @@ defmodule Fireside do
       - `[{:github, github_repo} | git_opts]`: Install from a GitHub repository. `git_opts` can include `:ref`, `:branch`, or `:tag`.
     - `opts`: A keyword list of options. Supported options include:
       - `:yes?` - When true, auto-accepts all prompts during the update.
+      - `:force?` - When true, skips integrity check and overwrites files.
+      - `:no_hash?` - When true, skips adding hash to files and .fireside.exs.
 
   ## Examples
 
@@ -113,7 +116,9 @@ defmodule Fireside do
   def update(component_name, source, opts) do
     local_component_config = get_local_component_config(component_name)
 
-    ensure_integrity!(local_component_config)
+    if !Keyword.get(opts, :force?, false) do
+      ensure_integrity!(local_component_config)
+    end
 
     Fireside.Helpers.ensure_clean_git!()
 
@@ -216,16 +221,12 @@ defmodule Fireside do
   end
 
   def uninstall(component_name, opts) when is_atom(component_name) do
+    local_component_config = get_local_component_config(component_name) || %{}
+
     igniter =
       Igniter.new()
-      |> track_managed_files(component_name)
+      |> track_managed_files(local_component_config)
       |> Igniter.assign(:imported_files, [])
-      |> Igniter.add_warning(
-        "Finally, any code modification that were performed in `setup/1` or `upgrade/3` by the component will not be removed. Please consult the component's original Fireside config (fireside.exs) to see if anything was added modified manually, such as config.exs."
-      )
-      |> Igniter.add_warning(
-        "Imported files that were marked as :optional in Fireside's component configuration will also not be deleted, as they could have existed before component installation (for example, `test/supports/data_case.ex` or `lib/my_app_web/endpoint.ex`)"
-      )
       |> Igniter.add_warning("""
       NOTE: the dependencies installed alongside the component will NOT be deleted as Fireside has no way of knowing if they are used elsewhere in the codebase.
 
@@ -233,8 +234,16 @@ defmodule Fireside do
 
       Keep in mind that those dependencies may have had associated Igniter installers that added some code or configuration to your codebase—you may want to delete that too.
       """)
+      |> Igniter.add_warning(
+        "Imported files that were marked as :optional in Fireside's component configuration will also not be deleted, as they could have existed before component installation (for example, `test/supports/data_case.ex` or `lib/my_app_web/endpoint.ex`)"
+      )
+      |> Igniter.add_warning(
+        "Finally, any code modification that were performed in `setup/1` or `upgrade/3` by the component will not be removed. Please consult the component's original Fireside config (fireside.exs) to see if anything was added modified manually, such as config.exs."
+      )
       |> add_deletions()
       |> remove_local_component_config(component_name)
+
+    run_igniter(igniter, opts)
 
     :ok
   end
@@ -331,7 +340,8 @@ defmodule Fireside do
         add_or_replace_fireside_lock(
           igniter,
           fireside_module,
-          origin
+          origin,
+          opts
         )
       end
 
@@ -469,7 +479,7 @@ defmodule Fireside do
     )
   end
 
-  defp add_or_replace_fireside_lock(igniter, fireside_module, origin) do
+  defp add_or_replace_fireside_lock(igniter, fireside_module, origin, opts \\ []) do
     igniter =
       for source <- Rewrite.sources(igniter.rewrite),
           Rewrite.Source.get(source, :path) in igniter.assigns.imported_files,
@@ -479,7 +489,10 @@ defmodule Fireside do
           {new_quoted, hash} =
             source
             |> Rewrite.Source.get(:quoted)
-            |> compute_and_include_hash(fireside_module.config()[:name])
+            |> compute_and_include_hash(
+              fireside_module.config()[:name],
+              Keyword.get(opts, :no_hash?, false)
+            )
 
           new_source =
             Rewrite.Source.update(
@@ -677,14 +690,17 @@ defmodule Fireside do
 
     for {file_path, hash} <- imported_component_config[:files] do
       if Igniter.exists?(igniter, file_path) do
-        source =
-          igniter.rewrite
-          |> Rewrite.source!(file_path)
-          |> Rewrite.Source.get(:quoted)
-          |> Fireside.Helpers.remove_fireside_comments()
+        # Skip integrity check if hash is nil (component was installed with --no-hash)
+        if !is_nil(hash) do
+          source =
+            igniter.rewrite
+            |> Rewrite.source!(file_path)
+            |> Rewrite.Source.get(:quoted)
+            |> Fireside.Helpers.remove_fireside_comments()
 
-        if Fireside.Helpers.calculate_hash(source) != hash do
-          raise "#{file_path} has diverged from its original source, aborting."
+          if Fireside.Helpers.calculate_hash(source) != hash do
+            raise "#{file_path} has diverged from its original source, aborting."
+          end
         end
       else
         raise "#{file_path} does not exist, aborting."
@@ -720,22 +736,29 @@ defmodule Fireside do
     end
   end
 
-  defp compute_and_include_hash(ast, component_name) do
-    hash = Fireside.Helpers.calculate_hash(ast)
+  defp compute_and_include_hash(ast, component_name, no_hash? \\ false) do
+    hash = if no_hash?, do: nil, else: Fireside.Helpers.calculate_hash(ast)
 
-    {Sourceror.prepend_comments(
-       ast,
-       [
-         %{
-           line: 1,
-           previous_eol_count: 1,
-           next_eol_count: 1,
-           text:
-             "#! fireside: DO NOT EDIT this file. Run `mix fireside.unlock #{component_name}` if you want to stop syncing."
-         }
-       ],
-       :leading
-     ), hash}
+    new_ast =
+      if no_hash? do
+        ast
+      else
+        Sourceror.prepend_comments(
+          ast,
+          [
+            %{
+              line: 1,
+              previous_eol_count: 1,
+              next_eol_count: 1,
+              text:
+                "#! fireside: DO NOT EDIT this file. Run `mix fireside.unlock #{component_name}` if you want to stop syncing."
+            }
+          ],
+          :leading
+        )
+      end
+
+    {new_ast, hash}
   end
 
   defp update_formatter_ignores(igniter) do

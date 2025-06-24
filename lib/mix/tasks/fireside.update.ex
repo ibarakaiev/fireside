@@ -15,6 +15,8 @@ defmodule Mix.Tasks.Fireside.Update do
   ## Options
 
   * `--yes` - auto-accept all prompts
+  * `--force` - skip integrity check and overwrite files
+  * `--no-hash` - skip adding hash to files and .fireside.exs
   """
   use Mix.Task
 
@@ -44,6 +46,10 @@ defmodule Mix.Tasks.Fireside.Update do
 
     Application.ensure_all_started([:rewrite])
 
-    Fireside.update(component_name, component_source, yes?: "--yes" in argv)
+    Fireside.update(component_name, component_source,
+      yes?: "--yes" in argv,
+      force?: "--force" in argv,
+      no_hash?: "--no-hash" in argv
+    )
   end
 end

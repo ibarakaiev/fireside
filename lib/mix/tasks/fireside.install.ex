@@ -15,6 +15,7 @@ defmodule Mix.Tasks.Fireside.Install do
 
   * `--unlocked` - the component will be installed without being tracked by Fireside.
   * `--yes` - auto-accept all prompts
+  * `--no-hash` - skip adding hash to files and .fireside.exs
   """
   use Mix.Task
 
@@ -50,7 +51,8 @@ defmodule Mix.Tasks.Fireside.Install do
 
     Fireside.install(component_name, component_source,
       unlocked?: "--unlocked" in argv,
-      yes?: "--yes" in argv
+      yes?: "--yes" in argv,
+      no_hash?: "--no-hash" in argv
     )
   end
 end
