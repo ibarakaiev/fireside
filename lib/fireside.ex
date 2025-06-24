@@ -3,6 +3,7 @@ defmodule Fireside do
   This is the documentation for the Fireside project.
   """
 
+  alias Igniter.Code.Common
   alias Igniter.Code.Function
   alias Igniter.Project.Config
   alias Sourceror.Zipper
@@ -24,14 +25,7 @@ defmodule Fireside do
   end
 
   def component_installed?(component_name) when is_atom(component_name) do
-    igniter = Igniter.new()
-
-    Config.configures_key?(
-      igniter,
-      "fireside.exs",
-      Igniter.Project.Application.app_name(igniter),
-      [Fireside, component_name]
-    )
+    get_local_component_config(component_name) != nil
   end
 
   @doc """
@@ -72,7 +66,7 @@ defmodule Fireside do
   def install(component_name, source, opts) when is_atom(component_name) do
     Fireside.Helpers.ensure_clean_git!()
 
-    do_install_or_update(Igniter.new(), component_name, source, opts)
+    do_install_or_update(component_name, source, opts)
   end
 
   @doc """
@@ -121,23 +115,20 @@ defmodule Fireside do
 
     ensure_integrity!(local_component_config)
 
-    opts = opts ++ [current_version: local_component_config[:version]]
-
     Fireside.Helpers.ensure_clean_git!()
 
-    igniter = track_managed_files(Igniter.new(), local_component_config)
+    opts = opts ++ [current_version: local_component_config[:version]]
 
     case source do
       nil ->
         do_install_or_update(
-          igniter,
           component_name,
           local_component_config[:origin],
           opts
         )
 
       source ->
-        do_install_or_update(igniter, component_name, source, opts)
+        do_install_or_update(component_name, source, opts)
     end
 
     :ok
@@ -225,11 +216,9 @@ defmodule Fireside do
   end
 
   def uninstall(component_name, opts) when is_atom(component_name) do
-    local_component_config = get_local_component_config(component_name)
-
     igniter =
       Igniter.new()
-      |> track_managed_files(local_component_config)
+      |> track_managed_files(component_name)
       |> Igniter.assign(:imported_files, [])
       |> Igniter.add_warning(
         "Finally, any code modification that were performed in `setup/1` or `upgrade/3` by the component will not be removed. Please consult the component's original Fireside config (fireside.exs) to see if anything was added modified manually, such as config.exs."
@@ -247,10 +236,6 @@ defmodule Fireside do
       |> add_deletions()
       |> remove_local_component_config(component_name)
 
-    if run_igniter(igniter, opts) == :changes_made do
-      cleanup_no_longer_used_files(igniter)
-    end
-
     :ok
   end
 
@@ -261,14 +246,14 @@ defmodule Fireside do
     )
   end
 
-  defp do_install_or_update(igniter, component_name, source, opts)
+  defp do_install_or_update(component_name, source, opts)
 
-  defp do_install_or_update(igniter, component_name, [{:github, github_repo} | params], opts) do
+  defp do_install_or_update(component_name, [{:github, github_repo} | params], opts) do
     git_url = "https://github.com/#{github_repo}.git"
-    do_install_or_update(igniter, component_name, [git: git_url] ++ params, opts)
+    do_install_or_update(component_name, [git: git_url] ++ params, opts)
   end
 
-  defp do_install_or_update(igniter, component_name, [{:git, git_url} | git_opts] = origin, opts) do
+  defp do_install_or_update(component_name, [{:git, git_url} | git_opts] = origin, opts) do
     temp_dir =
       Path.join(System.tmp_dir!(), "fireside_#{component_name}_#{:os.system_time(:millisecond)}")
 
@@ -290,16 +275,16 @@ defmodule Fireside do
         :ok
     end
 
-    import_component(igniter, component_name, temp_dir, origin, opts)
+    import_component(component_name, temp_dir, origin, opts)
 
     File.rm_rf!(temp_dir)
   end
 
-  defp do_install_or_update(igniter, component_name, [path: component_path] = origin, opts) do
-    import_component(igniter, component_name, component_path, origin, opts)
+  defp do_install_or_update(component_name, [path: component_path] = origin, opts) do
+    import_component(component_name, component_path, origin, opts)
   end
 
-  defp import_component(igniter, component_name, component_path, origin, opts) do
+  defp import_component(component_name, component_path, origin, opts) do
     current_version = Keyword.get(opts, :current_version, nil)
     unlocked? = Keyword.get(opts, :unlocked?, false)
 
@@ -308,6 +293,10 @@ defmodule Fireside do
     install_required_dependencies(component_path, yes?: Keyword.get(opts, :yes?, false))
 
     fireside_module = get_fireside_component_module(component_name, component_path)
+
+    local_component_config = get_local_component_config(component_name) || %{}
+
+    igniter = track_managed_files(Igniter.new(), local_component_config)
 
     {igniter, current_version} =
       case current_version do
@@ -333,6 +322,8 @@ defmodule Fireside do
       |> run_upgrades(fireside_module, current_version)
       |> replace_component_name(fireside_module)
       |> add_deletions()
+      |> update_formatter_ignores()
+      |> Igniter.format()
 
     igniter =
       if unlocked? do
@@ -345,14 +336,20 @@ defmodule Fireside do
         )
       end
 
-    igniter =
-      Igniter.add_notice(
-        igniter,
-        "\"#{component_name}\" (version: #{fireside_module.config()[:version]}) has been successfully installed."
-      )
+    Igniter.add_notice(
+      igniter,
+      "\"#{component_name}\" (version: #{fireside_module.config()[:version]}) has been successfully installed."
+    )
 
-    if run_igniter(igniter, opts) in [:changes_made, :no_changes] do
-      cleanup_no_longer_used_files(igniter)
+    run_igniter(igniter, opts)
+  end
+
+  defp format_managed_files(igniter) do
+    for source <- Rewrite.sources(igniter.rewrite),
+        Rewrite.Source.get(source, :path) in igniter.assigns.fireside_managed_files,
+        reduce: igniter do
+      igniter ->
+        Igniter.format(igniter, Rewrite.Source.get(source, :path))
     end
   end
 
@@ -374,8 +371,7 @@ defmodule Fireside do
             component_path,
             relative_path,
             skip_if_exists?: kind == :optional,
-            untracked?:
-              relative_path in fireside_component_files[:overwritable] or kind == :optional
+            untracked?: relative_path in fireside_component_files[:overwritable] or kind == :optional
           )
         end)
     end
@@ -399,13 +395,13 @@ defmodule Fireside do
     proper_location =
       case relative_file_path do
         "/lib/" <> _ ->
-          Igniter.Code.Module.proper_location(module_name)
+          Igniter.Project.Module.proper_location(igniter, module_name, :source_folder)
 
         "/test/support/" <> _ ->
-          Igniter.Code.Module.proper_test_support_location(module_name)
+          Igniter.Project.Module.proper_location(igniter, module_name, :test_support)
 
         "/test/" <> _ ->
-          Igniter.Code.Module.proper_test_location(module_name)
+          Igniter.Project.Module.proper_location(igniter, module_name, :test)
       end
 
     igniter =
@@ -453,29 +449,22 @@ defmodule Fireside do
 
     for file_path <- deletion_list, reduce: igniter do
       igniter ->
-        igniter
-        |> Igniter.add_warning("#{file_path} will be deleted.")
-        |> Igniter.update_assign(:deletions, [file_path], fn deletions ->
-          deletions ++ [file_path]
-        end)
-    end
-  end
-
-  defp cleanup_no_longer_used_files(igniter) do
-    for file_path <- igniter.assigns.deletions do
-      File.rm!(file_path)
+        Igniter.rm(igniter, file_path)
     end
   end
 
   defp remove_local_component_config(igniter, component_name) do
-    Config.configure(
+    Igniter.update_elixir_file(
       igniter,
-      "fireside.exs",
-      Igniter.Project.Application.app_name(igniter),
-      [Fireside],
-      [],
-      updater: fn zipper ->
-        Igniter.Code.Keyword.remove_keyword_key(zipper, component_name)
+      ".fireside.exs",
+      fn zipper ->
+        rightmost = Common.rightmost(zipper)
+
+        if Igniter.Code.List.list?(rightmost) do
+          Igniter.Code.Keyword.remove_keyword_key(zipper, component_name)
+        else
+          raise "Expected the last element of the .fireside.exs file to be a list, got #{rightmost}"
+        end
       end
     )
   end
@@ -509,37 +498,27 @@ defmodule Fireside do
           )
       end
 
-    app_name = Igniter.Project.Application.app_name(igniter)
+    fireside_component_name = fireside_module.config()[:name]
 
-    igniter
-    |> Config.configure(
-      "fireside.exs",
-      app_name,
-      [Fireside, fireside_module.config()[:name], :origin],
-      origin
-    )
-    |> Config.configure(
-      "fireside.exs",
-      app_name,
-      [Fireside, fireside_module.config()[:name], :version],
-      fireside_module.config()[:version]
-    )
-    |> Config.configure(
-      "fireside.exs",
-      app_name,
-      [Fireside, fireside_module.config()[:name], :files],
-      Macro.escape(igniter.assigns.hashes)
-    )
+    local_component_config = get_local_component_config(fireside_component_name) || %{}
+
+    new_component_config =
+      local_component_config
+      |> Map.put(:origin, origin)
+      |> Map.put(:version, fireside_module.config()[:version])
+      |> Map.put(:files, igniter.assigns.hashes)
+
+    update_component_config(igniter, fireside_component_name, new_component_config)
   end
 
   defp ensure_path_is_a_fireside_component!(path) do
-    unless File.dir?(path) do
+    if !File.dir?(path) do
       raise "directory `#{path}` doesn't exist"
     end
 
     fireside_module_path = Path.join(path, "/fireside.exs")
 
-    unless File.exists?(fireside_module_path) do
+    if !File.exists?(fireside_module_path) do
       raise "#{path} is not a Fireside component, aborting."
     end
   end
@@ -549,57 +528,60 @@ defmodule Fireside do
 
     fireside_module = Fireside.Helpers.load_module(fireside_module_path)
 
-    unless fireside_module.config()[:name] == component_name do
+    if fireside_module.config()[:name] != component_name do
       raise "The provided Fireside module is not \"#{component_name}\""
     end
 
     fireside_module
   end
 
-  defp get_local_component_config(component_name) do
-    zipper =
-      "config/fireside.exs"
-      |> File.read!()
-      |> Sourceror.parse_string!()
-      |> Sourceror.Zipper.zip()
+  def update_component_config(igniter, component_name, new_config) do
+    Igniter.create_or_update_elixir_file(
+      igniter,
+      ".fireside.exs",
+      """
+      [
+        components: [
+          #{component_name}: #{inspect(new_config)}
+        ]
+      ]
+      """,
+      fn zipper ->
+        rightmost = Common.rightmost(zipper)
 
-    otp_app = Igniter.Project.Application.app_name(Igniter.new())
-
-    {:ok, zipper} =
-      Function.move_to_function_call_in_current_scope(
-        zipper,
-        :config,
-        3,
-        fn function_call ->
-          Function.argument_equals?(function_call, 0, otp_app) and
-            Function.argument_equals?(function_call, 1, Fireside) and
-            Function.argument_matches_predicate?(
-              function_call,
-              2,
-              fn argument_zipper ->
-                Igniter.Code.Keyword.keyword_has_path?(argument_zipper, [component_name])
-              end
-            )
+        if Igniter.Code.List.list?(rightmost) do
+          Igniter.Code.Keyword.put_in_keyword(zipper, [:components, component_name], new_config)
+        else
+          raise "Expected the last element of the .fireside.exs file to be a list, got #{rightmost}"
         end
-      )
+      end
+    )
+  end
 
-    {{:__block__, _, [^component_name]}, map} =
-      zipper
-      |> Function.move_to_nth_argument(2)
-      |> then(fn {:ok, zipper} -> zipper end)
-      |> Sourceror.Zipper.down()
-      |> Sourceror.Zipper.node()
+  defp get_local_component_config(component_name) do
+    fireside_config = parse_project_fireside_config()
 
-    {config, []} =
-      map
-      |> Sourceror.to_string()
-      |> Code.eval_string()
+    if fireside_config[:components] do
+      fireside_config[:components][component_name]
+    end
+  end
 
-    config
+  defp parse_project_fireside_config do
+    igniter = Igniter.include_existing_file(Igniter.new(), ".fireside.exs")
+
+    case Rewrite.source(igniter.rewrite, ".fireside.exs") do
+      {:error, _} ->
+        []
+
+      {:ok, source} ->
+        {fireside_exs, _} = source |> Rewrite.Source.get(:quoted) |> Code.eval_quoted()
+
+        fireside_exs
+    end
   end
 
   defp track_managed_files(igniter, local_component_config) do
-    for {file_path, _hash} <- local_component_config[:files], reduce: igniter do
+    for {file_path, _hash} <- Map.get(local_component_config, :files, []), reduce: igniter do
       igniter ->
         igniter
         |> Igniter.include_existing_file(file_path)
@@ -618,7 +600,7 @@ defmodule Fireside do
     igniter = Igniter.include_all_elixir_files(igniter)
 
     for source <- Rewrite.sources(igniter.rewrite),
-        Rewrite.Source.get(source, :path) != "config/fireside.exs",
+        Rewrite.Source.get(source, :path) != ".fireside.exs",
         reduce: igniter do
       igniter ->
         new_quoted =
@@ -647,7 +629,7 @@ defmodule Fireside do
   defp install_required_dependencies(component_path, opts) do
     mix_file = Path.join(component_path, "mix.exs")
 
-    unless File.exists?(mix_file) do
+    if !File.exists?(mix_file) do
       raise "mix.exs not found in the component directory"
     end
 
@@ -658,7 +640,7 @@ defmodule Fireside do
       |> Sourceror.Zipper.zip()
       |> Function.move_to_defp(:deps, 0)
       |> then(fn {:ok, zipper} ->
-        case Igniter.Code.Common.move_right(zipper, &Igniter.Code.List.list?/1) do
+        case Common.move_right(zipper, &Igniter.Code.List.list?/1) do
           {:ok, zipper} ->
             zipper
 
@@ -701,7 +683,7 @@ defmodule Fireside do
           |> Rewrite.Source.get(:quoted)
           |> Fireside.Helpers.remove_fireside_comments()
 
-        unless Fireside.Helpers.calculate_hash(source) == hash do
+        if Fireside.Helpers.calculate_hash(source) != hash do
           raise "#{file_path} has diverged from its original source, aborting."
         end
       else
@@ -754,5 +736,9 @@ defmodule Fireside do
        ],
        :leading
      ), hash}
+  end
+
+  defp update_formatter_ignores(igniter) do
+    igniter
   end
 end

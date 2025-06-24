@@ -20,7 +20,8 @@ defmodule Mix.Tasks.Fireside.Install do
 
   @impl true
   def run(argv) do
-    {component_requirements, argv} = Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
+    {component_requirements, argv} =
+      Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
 
     if length(component_requirements) != 1 do
       raise "Only one component can be provided."
@@ -47,6 +48,9 @@ defmodule Mix.Tasks.Fireside.Install do
 
     Application.ensure_all_started([:rewrite])
 
-    Fireside.install(component_name, component_source, unlocked?: "--unlocked" in argv, yes?: "--yes" in argv)
+    Fireside.install(component_name, component_source,
+      unlocked?: "--unlocked" in argv,
+      yes?: "--yes" in argv
+    )
   end
 end

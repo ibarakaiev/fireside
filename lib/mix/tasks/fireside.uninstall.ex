@@ -20,7 +20,8 @@ defmodule Mix.Tasks.Fireside.Uninstall do
 
   @impl true
   def run(argv) do
-    {component_name, argv} = Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
+    {component_name, argv} =
+      Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
 
     if length(component_name) != 1 do
       raise "Exactly one component must be provided."

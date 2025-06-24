@@ -20,7 +20,8 @@ defmodule Mix.Tasks.Fireside.Update do
 
   @impl true
   def run(argv) do
-    {component_requirements, argv} = Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
+    {component_requirements, argv} =
+      Enum.split_while(argv, fn arg -> not String.starts_with?(arg, "-") end)
 
     if length(component_requirements) != 1 do
       raise "Exactly one component must be provided."
