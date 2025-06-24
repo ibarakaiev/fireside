@@ -323,7 +323,6 @@ defmodule Fireside do
       |> replace_component_name(fireside_module)
       |> add_deletions()
       |> update_formatter_ignores()
-      |> Igniter.format()
 
     igniter =
       if unlocked? do
@@ -344,7 +343,7 @@ defmodule Fireside do
     run_igniter(igniter, opts)
   end
 
-  defp format_managed_files(igniter) do
+  defp format(igniter) do
     for source <- Rewrite.sources(igniter.rewrite),
         Rewrite.Source.get(source, :path) in igniter.assigns.fireside_managed_files,
         reduce: igniter do
@@ -371,7 +370,8 @@ defmodule Fireside do
             component_path,
             relative_path,
             skip_if_exists?: kind == :optional,
-            untracked?: relative_path in fireside_component_files[:overwritable] or kind == :optional
+            untracked?:
+              relative_path in fireside_component_files[:overwritable] or kind == :optional
           )
         end)
     end
